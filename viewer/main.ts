@@ -368,107 +368,112 @@ class ValleyScene extends Phaser.Scene {
       });
     }
 
-    // 1. Slice sub-frames from Ground Tiles.png
+    // The source atlas is NOT a uniform tile sheet: its upper region contains
+    // dense forest borders, while ordinary meadow and path tiles are lower down.
+    // Keep precise crop coordinates documented here to prevent accidental reuse.
     const groundTex = this.textures.get('ground');
-    if (!groundTex.has('grass-0')) groundTex.add('grass-0', 0, 0, 0, 16, 16);
-    if (!groundTex.has('grass-1')) groundTex.add('grass-1', 0, 16, 0, 16, 16);
-    if (!groundTex.has('grass-2')) groundTex.add('grass-2', 0, 32, 0, 16, 16);
-    if (!groundTex.has('dirt-path')) groundTex.add('dirt-path', 0, 16, 416, 16, 16);
-    if (!groundTex.has('water-tile')) groundTex.add('water-tile', 0, 16, 80, 16, 16);
-    if (!groundTex.has('farmland-tile')) groundTex.add('farmland-tile', 0, 0, 416, 16, 16);
-    if (!groundTex.has('cliff-tile')) groundTex.add('cliff-tile', 0, 16, 32, 16, 16);
+    const groundFrames: Record<string, [number, number, number, number]> = {
+      meadow: [0, 64, 16, 16],
+      'meadow-sprig': [0, 288, 16, 16],
+      'meadow-flower': [16, 320, 16, 16],
+      'dirt-path': [16, 256, 16, 16],
+      farmland: [16, 160, 16, 16],
+      bridge: [16, 384, 48, 80],
+    };
+    for (const [key, [x, y, w, h]] of Object.entries(groundFrames)) {
+      if (!groundTex.has(key)) groundTex.add(key, 0, x, y, w, h);
+    }
 
-    // 2. Slice sub-frames from PreMade Buildings.png
-    const bldgTex = this.textures.get('buildings');
-    if (!bldgTex.has('cottage-west')) bldgTex.add('cottage-west', 0, 16, 256, 112, 64);
-    if (!bldgTex.has('cottage-east')) bldgTex.add('cottage-east', 0, 160, 256, 112, 64);
-    if (!bldgTex.has('windmill-tower')) bldgTex.add('windmill-tower', 0, 416, 64, 64, 80);
-    if (!bldgTex.has('workshop-shed')) bldgTex.add('workshop-shed', 0, 352, 64, 32, 80);
+    const buildingTex = this.textures.get('buildings');
+    // Full buildings including their walls and doors; the old 64px crops cut them in half.
+    const buildingFrames: Record<string, [number, number, number, number]> = {
+      'cottage-west': [16, 256, 112, 128],
+      'cottage-east': [160, 256, 112, 128],
+      'windmill-tower': [16, 0, 112, 128],
+      'workshop-shed': [288, 272, 128, 112],
+    };
+    for (const [key, [x, y, w, h]] of Object.entries(buildingFrames)) {
+      if (!buildingTex.has(key)) buildingTex.add(key, 0, x, y, w, h);
+    }
 
-    // 3. Slice sub-frames from Building Props.png
     const propsTex = this.textures.get('props');
-    if (!propsTex.has('stone-well')) propsTex.add('stone-well', 0, 16, 96, 32, 32);
-    if (!propsTex.has('wooden-bridge')) propsTex.add('wooden-bridge', 0, 128, 48, 32, 16);
-    if (!propsTex.has('barrel')) propsTex.add('barrel', 0, 0, 16, 16, 16);
-    if (!propsTex.has('crates')) propsTex.add('crates', 0, 0, 32, 16, 16);
-    if (!propsTex.has('workbench')) propsTex.add('workbench', 0, 32, 0, 32, 16);
+    // The berry crops are in Building Props, not in the Decor barrel row.
+    if (!propsTex.has('berry-bush')) propsTex.add('berry-bush', 0, 224, 0, 32, 32);
 
-    // 4. Slice sub-frames from Decor.png
     const decorTex = this.textures.get('decor');
-    if (!decorTex.has('oak-tree')) decorTex.add('oak-tree', 0, 0, 0, 48, 64);
-    if (!decorTex.has('pine-tree')) decorTex.add('pine-tree', 0, 80, 0, 32, 48);
-    if (!decorTex.has('berry-bush')) decorTex.add('berry-bush', 0, 0, 144, 48, 32);
-    if (!decorTex.has('campfire-lit')) decorTex.add('campfire-lit', 0, 0, 128, 16, 16);
-    if (!decorTex.has('rock-large')) decorTex.add('rock-large', 0, 16, 48, 32, 32);
-    if (!decorTex.has('flowers')) decorTex.add('flowers', 0, 32, 224, 16, 16);
+    const decorFrames: Record<string, [number, number, number, number]> = {
+      'oak-tree': [0, 296, 80, 104],
+      'pine-tree': [80, 336, 48, 64],
+      'stone-well': [0, 240, 32, 48],
+      'campfire-lit': [64, 256, 32, 32],
+      'barrel': [0, 128, 16, 16],
+      'crates': [96, 128, 32, 16],
+      'rock-large': [176, 368, 32, 32],
+      flowers: [144, 0, 16, 16],
+    };
+    for (const [key, [x, y, w, h]] of Object.entries(decorFrames)) {
+      if (!decorTex.has(key)) decorTex.add(key, 0, x, y, w, h);
+    }
 
-    // 5. Slice sub-frames from Shadows.png
     const shadowTex = this.textures.get('shadows');
     if (!shadowTex.has('shadow-med')) shadowTex.add('shadow-med', 0, 0, 0, 48, 16);
     if (!shadowTex.has('shadow-large')) shadowTex.add('shadow-large', 0, 0, 16, 64, 32);
 
-    // Render 20x14 cell base landscape using Ground Tiles.png
+    // Deterministic art-only landscape. No engine movement, resource, or save changes.
+    // The routes stay connected from the western bridge to both cottages and village services.
     for (let y = 0; y < 14; y++) {
       for (let x = 0; x < 20; x++) {
         const px = x * 40;
         const py = y * 40;
-
-        // River stream down column 0, with wooden bridge at y=6
         if (x === 0) {
-          this.add.image(px, py, 'ground', 'water-tile')
-            .setDisplaySize(40, 40)
-            .setOrigin(0, 0)
-            .setDepth(1);
-          if (y === 6) {
-            this.add.image(px, py + 8, 'props', 'wooden-bridge')
-              .setDisplaySize(40, 24)
-              .setOrigin(0, 0)
-              .setDepth(2);
+          this.add.rectangle(px + 20, py + 20, 40, 40, 0x498fa7).setDepth(1);
+          this.add.rectangle(px + 35, py + 20, 6, 40, 0x76ab80).setDepth(1);
+          if ((y % 2) === 0) {
+            this.add.rectangle(px + 15, py + 14, 14, 2, 0x9bcdd4).setDepth(2);
           }
           continue;
         }
-
-        // Farmland soil plots around (14..16, 8..9)
-        if (x >= 14 && x <= 16 && y >= 8 && y <= 9) {
-          this.add.image(px, py, 'ground', 'farmland-tile')
-            .setDisplaySize(40, 40)
-            .setOrigin(0, 0)
-            .setDepth(1);
-          continue;
-        }
-
-        // Dirt paths connecting bridge, cottages, granary, and workshop
-        const isPath = (y === 6 && x >= 1 && x <= 4)
+        const road = (y === 6 && x >= 1 && x <= 10)
           || (x === 5 && y >= 4 && y <= 6)
-          || (y === 5 && x >= 5 && x <= 9)
-          || (x === 9 && y >= 5 && y <= 7)
-          || (y === 7 && x >= 9 && x <= 15)
-          || (x === 12 && y === 6);
-
-        if (isPath) {
-          this.add.image(px, py, 'ground', 'dirt-path')
-            .setDisplaySize(40, 40)
-            .setOrigin(0, 0)
-            .setDepth(1);
-          continue;
+          || (x === 9 && y >= 5 && y <= 8)
+          || (y === 5 && x >= 6 && x <= 10)
+          || (y === 8 && x >= 9 && x <= 15)
+          || (x === 12 && y === 7)
+          || (x === 15 && y === 7);
+        const garden = (x >= 16 && x <= 18 && (y === 8 || y === 9));
+        const frame = road ? 'dirt-path' : garden ? 'farmland' : 'meadow';
+        this.add.image(px, py, 'ground', frame)
+          .setDisplaySize(40, 40).setOrigin(0, 0).setDepth(1);
+        // Sparse texture, with intentional large clearings around the buildings.
+        const detail = (x * 397 + y * 167 + x * y * 11) % 31;
+        if (!road && !garden && detail === 3) {
+          this.add.image(px + 20, py + 20, 'ground', 'meadow-sprig')
+            .setDisplaySize(20, 20).setDepth(2);
         }
-
-        // Cliff ridges at NW and NE corners
-        if ((x === 1 && y === 0) || (x >= 18 && y <= 1)) {
-          this.add.image(px, py, 'ground', 'cliff-tile')
-            .setDisplaySize(40, 40)
-            .setOrigin(0, 0)
-            .setDepth(1);
-          continue;
+        if (!road && !garden && detail === 14) {
+          this.add.image(px + 20, py + 20, 'ground', 'meadow-flower')
+            .setDisplaySize(18, 18).setDepth(2);
         }
-
-        // Natural meadow grass with texture variations
-        const variant = ['grass-0', 'grass-1', 'grass-2'][(x * 7 + y * 13) % 3];
-        this.add.image(px, py, 'ground', variant)
-          .setDisplaySize(40, 40)
-          .setOrigin(0, 0)
-          .setDepth(1);
+        if (garden && (x + y) % 2 === 1) {
+          this.add.image(px + 20, py + 20, 'props', 'berry-bush')
+            .setDisplaySize(32, 32).setDepth(3);
+        }
       }
+    }
+    this.add.image(20, 6 * 40 + 18, 'ground', 'bridge')
+      .setDisplaySize(42, 62).setDepth(3);
+
+    // Trees are scenic edge framing, not a carpet of impassable forest tiles.
+    for (const [x, y, kind] of [
+      [2, 2, 'oak-tree'], [7, 1, 'pine-tree'],
+      [11, 1, 'oak-tree'], [17, 2, 'pine-tree'],
+      [19, 4, 'pine-tree'], [2, 12, 'pine-tree'],
+      [7, 13, 'oak-tree'], [12, 12, 'pine-tree'],
+      [18, 13, 'oak-tree'],
+    ] as const) {
+      this.add.image(x * 40 + 20, y * 40 + 2, 'decor', kind)
+        .setScale(kind === 'oak-tree' ? 0.9 : 1.05)
+        .setOrigin(0.5, 1).setDepth(3);
     }
 
     // Render permanent landmark structures using PreMade Buildings.png and Props
@@ -492,133 +497,48 @@ class ValleyScene extends Phaser.Scene {
   }
 
   private renderLandmarkVisuals(): void {
-    // 1. Pioneer's Cottage at (5, 4) from PreMade Buildings.png
-    const cwX = 5 * 40 + 20;
-    const cwY = 4 * 40 + 20;
-    this.add.image(cwX, cwY + 16, 'shadows', 'shadow-large').setScale(1.8).setDepth(2);
-    const cottageWest = this.add.image(cwX, cwY + 8, 'buildings', 'cottage-west')
-      .setOrigin(0.5, 0.7)
-      .setScale(0.85)
-      .setDepth(4)
+    // Building sprites are bottom-anchored: the foundation, not the roof,
+    // meets its authoritative landmark. All buildings remain clickable.
+    const addBuilding = (
+      id: string, px: number, py: number, frame: string, width: number, height: number,
+    ) => {
+      this.add.image(px, py + 10, 'shadows', 'shadow-large')
+        .setDisplaySize(width * 0.8, 18).setDepth(2);
+      const building = this.add.image(px, py, 'buildings', frame)
+        .setDisplaySize(width, height).setOrigin(0.5, 1)
+        .setDepth(4).setInteractive({ useHandCursor: true });
+      building.on('pointerdown', () => selectEntity(id, 'landmark'));
+    };
+
+    addBuilding('cottage-west', 5 * 40 + 20, 4 * 40 + 32, 'cottage-west', 100, 114);
+    addBuilding('cottage-east', 15 * 40 + 20, 7 * 40 + 27, 'cottage-east', 102, 114);
+    addBuilding('workshop', 12 * 40 + 20, 7 * 40 + 25, 'workshop-shed', 98, 86);
+    addBuilding('granary', 9 * 40 + 20, 7 * 40 + 42, 'windmill-tower', 98, 112);
+
+    // The shared commons is a clear, walkable central gathering area.
+    const well = this.add.image(9 * 40 + 12, 5 * 40 + 25, 'decor', 'stone-well')
+      .setDisplaySize(34, 46).setOrigin(0.5, 1).setDepth(5)
       .setInteractive({ useHandCursor: true });
-    cottageWest.on('pointerdown', () => selectEntity('cottage-west', 'landmark'));
+    well.on('pointerdown', () => selectEntity('commons', 'landmark'));
+    this.add.image(8 * 40 + 12, 5 * 40 + 29, 'decor', 'campfire-lit')
+      .setDisplaySize(31, 30).setOrigin(0.5, 1).setDepth(5);
 
-    const cottageWestText = this.add.text(cwX, cwY - 32, "Pioneer's Cottage", {
-      fontFamily: 'Segoe UI, sans-serif',
-      fontSize: '12px',
-      fontStyle: 'bold',
-      color: '#233f38',
-      backgroundColor: '#edf3efdd',
-      padding: { x: 4, y: 1 },
-    }).setOrigin(0.5).setDepth(7).setInteractive({ useHandCursor: true });
-    cottageWestText.on('pointerdown', () => selectEntity('cottage-west', 'landmark'));
+    this.add.image(12 * 40 - 16, 7 * 40 + 26, 'decor', 'barrel')
+      .setDisplaySize(19, 19).setOrigin(0.5, 1).setDepth(5);
+    this.add.image(9 * 40 - 27, 7 * 40 + 31, 'decor', 'crates')
+      .setDisplaySize(30, 17).setOrigin(0.5, 1).setDepth(5);
 
-    // 2. Valley Haven Cottage at (15, 7) from PreMade Buildings.png
-    const ceX = 15 * 40 + 20;
-    const ceY = 7 * 40 + 20;
-    this.add.image(ceX, ceY + 16, 'shadows', 'shadow-large').setScale(1.8).setDepth(2);
-    const cottageEast = this.add.image(ceX, ceY + 8, 'buildings', 'cottage-east')
-      .setOrigin(0.5, 0.7)
-      .setScale(0.85)
-      .setDepth(4)
-      .setInteractive({ useHandCursor: true });
-    cottageEast.on('pointerdown', () => selectEntity('cottage-east', 'landmark'));
-
-    const cottageEastText = this.add.text(ceX, ceY - 32, 'Valley Haven', {
-      fontFamily: 'Segoe UI, sans-serif',
-      fontSize: '12px',
-      fontStyle: 'bold',
-      color: '#233f38',
-      backgroundColor: '#edf3efdd',
-      padding: { x: 4, y: 1 },
-    }).setOrigin(0.5).setDepth(7).setInteractive({ useHandCursor: true });
-    cottageEastText.on('pointerdown', () => selectEntity('cottage-east', 'landmark'));
-
-    // 3. Commons & Campfire Plaza at (9, 5) & (8, 5) from Building Props.png & Decor.png
-    const comX = 9 * 40 + 20;
-    const comY = 5 * 40 + 20;
-    const stoneWell = this.add.image(comX, comY + 4, 'props', 'stone-well')
-      .setScale(1.1)
-      .setDepth(4)
-      .setInteractive({ useHandCursor: true });
-    stoneWell.on('pointerdown', () => selectEntity('commons', 'landmark'));
-
-    const fireX = 8 * 40 + 20;
-    const fireY = 5 * 40 + 20;
-    this.add.image(fireX, fireY + 4, 'decor', 'campfire-lit')
-      .setScale(1.5)
-      .setDepth(4);
-
-    const commonsText = this.add.text(comX - 20, comY - 26, 'Commons & Well', {
-      fontFamily: 'Segoe UI, sans-serif',
-      fontSize: '12px',
-      fontStyle: 'bold',
-      color: '#233f38',
-      backgroundColor: '#edf3efdd',
-      padding: { x: 4, y: 1 },
-    }).setOrigin(0.5).setDepth(7).setInteractive({ useHandCursor: true });
-    commonsText.on('pointerdown', () => selectEntity('commons', 'landmark'));
-
-    // 4. Valley Workshop at (12, 7) from PreMade Buildings.png & Props
-    const wsX = 12 * 40 + 20;
-    const wsY = 7 * 40 + 20;
-    this.add.image(wsX, wsY + 16, 'shadows', 'shadow-med').setScale(1.5).setDepth(2);
-    const workshopShed = this.add.image(wsX, wsY + 4, 'buildings', 'workshop-shed')
-      .setOrigin(0.5, 0.7)
-      .setScale(0.9)
-      .setDepth(4)
-      .setInteractive({ useHandCursor: true });
-    workshopShed.on('pointerdown', () => selectEntity('workshop', 'landmark'));
-
-    this.add.image(wsX + 22, wsY + 14, 'props', 'workbench').setScale(1.2).setDepth(5);
-    this.add.image(wsX - 20, wsY + 14, 'props', 'crates').setScale(1.2).setDepth(5);
-
-    const workshopText = this.add.text(wsX, wsY - 32, 'Workshop', {
-      fontFamily: 'Segoe UI, sans-serif',
-      fontSize: '12px',
-      fontStyle: 'bold',
-      color: '#233f38',
-      backgroundColor: '#edf3efdd',
-      padding: { x: 4, y: 1 },
-    }).setOrigin(0.5).setDepth(7).setInteractive({ useHandCursor: true });
-    workshopText.on('pointerdown', () => selectEntity('workshop', 'landmark'));
-
-    // 5. Village Windmill & Granary at (9, 7) from PreMade Buildings.png & WindmillBlade-Animation.png
-    const wmX = 9 * 40 + 20;
-    const wmY = 7 * 40 + 16;
-    this.add.image(wmX, wmY + 18, 'shadows', 'shadow-large').setScale(1.6).setDepth(2);
-
-    const windmillTower = this.add.image(wmX, wmY - 4, 'buildings', 'windmill-tower')
-      .setOrigin(0.5, 0.6)
-      .setScale(1.0)
-      .setDepth(4)
-      .setInteractive({ useHandCursor: true });
-    windmillTower.on('pointerdown', () => selectEntity('granary', 'landmark'));
-
-    this.add.image(wmX - 18, wmY + 16, 'props', 'barrel').setScale(1.2).setDepth(5);
-    this.add.image(wmX + 18, wmY + 16, 'props', 'crates').setScale(1.2).setDepth(5);
-
-    // Animated Windmill Blades
-    this.windmillBlade = this.add.sprite(wmX, wmY - 38, 'windmill')
-      .setDepth(6)
-      .setScale(0.68)
-      .setInteractive({ useHandCursor: true });
+    // The spritesheet provides the moving four-sail assembly.
+    this.windmillBlade = this.add.sprite(9 * 40 + 18, 7 * 40 - 44, 'windmill')
+      .setDisplaySize(73, 57).setDepth(6).setInteractive({ useHandCursor: true });
     this.windmillBlade.play('spin-windmill');
     this.windmillBlade.on('pointerdown', () => selectEntity('granary', 'landmark'));
 
-    const granaryText = this.add.text(wmX, wmY + 28, 'Windmill & Granary', {
-      fontFamily: 'Segoe UI, sans-serif',
-      fontSize: '12px',
-      fontStyle: 'bold',
-      color: '#233f38',
-      backgroundColor: '#edf3efdd',
-      padding: { x: 4, y: 1 },
-    }).setOrigin(0.5).setDepth(7).setInteractive({ useHandCursor: true });
-    granaryText.on('pointerdown', () => selectEntity('granary', 'landmark'));
-
-    // Nature decor: Rocks and Flowers
-    this.add.image(18 * 40 + 20, 2 * 40 + 20, 'decor', 'rock-large').setScale(1.1).setDepth(3);
-    this.add.image(17 * 40 + 12, 11 * 40 + 12, 'decor', 'flowers').setScale(1.3).setDepth(3);
+    // A handful of local details; never put permanent label cards over the scene.
+    this.add.image(18 * 40 + 20, 2 * 40 + 20, 'decor', 'rock-large')
+      .setDisplaySize(24, 24).setDepth(3);
+    this.add.image(17 * 40 + 12, 11 * 40 + 12, 'decor', 'flowers')
+      .setDisplaySize(16, 16).setDepth(3);
   }
 
   update(): void {
@@ -638,16 +558,16 @@ class ValleyScene extends Phaser.Scene {
           if (p.id === 'east-wood') {
             // Pine grove at (13, 3)
             this.add.image(x, y + 14, 'shadows', 'shadow-med').setScale(1.2).setDepth(2);
-            this.add.image(x, y + 6, 'decor', 'pine-tree').setScale(1.15).setDepth(4);
+            this.add.image(x, y + 6, 'decor', 'pine-tree').setScale(0.9).setDepth(4);
           } else {
             // Oak tree grove at (4, 10)
             this.add.image(x, y + 14, 'shadows', 'shadow-large').setScale(1.2).setDepth(2);
-            this.add.image(x, y + 4, 'decor', 'oak-tree').setScale(0.95).setDepth(4);
+            this.add.image(x, y + 4, 'decor', 'oak-tree').setScale(0.77).setDepth(4);
           }
         } else {
           // Lush berry bushes from Decor.png
           this.add.image(x, y + 12, 'shadows', 'shadow-med').setScale(1.1).setDepth(2);
-          this.add.image(x, y + 6, 'decor', 'berry-bush').setScale(0.95).setDepth(4);
+          this.add.image(x, y + 6, 'props', 'berry-bush').setScale(0.95).setDepth(4);
         }
         const label = this.add.text(x, y - 32, '', {
           fontFamily: 'Segoe UI, sans-serif',
@@ -656,7 +576,7 @@ class ValleyScene extends Phaser.Scene {
           color: '#233f38',
           backgroundColor: '#edf3efdd',
           padding: { x: 4, y: 1 },
-        }).setOrigin(0.5).setDepth(7);
+        }).setOrigin(0.5).setDepth(7).setVisible(false);
         this.resources.set(p.id, label);
       }
     }
@@ -713,10 +633,11 @@ class ValleyScene extends Phaser.Scene {
         // Name tag
         const label = this.add.text(0, 18, a.name, {
           fontFamily: 'Segoe UI, sans-serif',
-          fontSize: '13px',
+          fontSize: '11px',
           fontStyle: 'bold',
           color: '#233f38',
-          backgroundColor: '#edf3efdd',
+          color: '#ffffff',
+          backgroundColor: '#203c33ec',
           padding: { x: 4, y: 1 },
         }).setOrigin(0.5, 0);
 
