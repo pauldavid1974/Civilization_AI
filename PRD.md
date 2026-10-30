@@ -1,5 +1,14 @@
 # Project brief / PRD — Civilization_AI
 
+## Current milestone — 29 October 2026
+
+The owner has now authorized a bounded original TypeScript/Node engine, SQLite persistence
+and Phaser viewer: [The Living Valley — Prototype 0.1](docs/specs/living-valley-0.1.md).
+Four inhabitants and deterministic test cognition form the first runnable slice; actual LLM
+and advanced memory are pending. The governance-setup scope and proposed future milestones
+below are retained as historical context, not a denial of this newer authorization.
+No spending, provider calls, deployments, public access or governance changes are authorized.
+
 ## Problem / why
 
 Explore whether autonomous AI inhabitants can live, learn, explore and create a shared history

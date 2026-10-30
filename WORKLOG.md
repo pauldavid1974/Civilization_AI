@@ -1,5 +1,24 @@
 # Work log — Civilization_AI
 
+## 2026-10-29 — The Living Valley, Prototype 0.1
+
+- **Authorization:** owner's continuation permits bounded local implementation and PR; excludes
+  spending, providers/models, deployment/public access, new services and governance changes.
+- **Branch:** `feat/living-valley-prototype`, from main `ed2d147`.
+- **Sequence:** read main policy/design/checks; commit fresh bounded spec as `68e0d60` before code;
+  implement engine/SQLite/HTTP/Phaser and tests as `f2c4f01`; finish viewer QA and handoff docs.
+- **Implemented:** four deterministic inhabitants, personal observations, independent opportunities,
+  resumable plans, finite material operations, persisted fixed clock and atomic state/event commits.
+  Loopback observer is browser-independent. No AI Town imports; MIT DraganDrop license unchanged.
+- **Evidence:** clean npm install; strict types; 14 product tests; five-day conservation; exact
+  restart/closed-file restore; storage rollback/failure and single-writer checks; desktop/mobile
+  Chromium smoke with no console errors or external requests. See `docs/prototype-validation.md`.
+- **Controls:** existing governance/project checks and secret scan pass; normal commit hooks used.
+  No trust-root files changed. Product checks are local evidence, not newly enforced CI.
+- **Limits/next:** deterministic test cognition only; resources finite; no dialogue/institutions,
+  advanced memory or invention. Future inference/provider/capacity and CI-control work need their
+  own authorized scope. Paul reviews the PR; no merge by this agent.
+
 ## 2026-10-29 — Activate and verify GitHub protections
 
 - **Branch:** `chore/activate-governance-protections`; documentation proposal in PR #2.

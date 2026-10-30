@@ -140,7 +140,12 @@ class ValleyScene extends Phaser.Scene {
         this.actors.set(a.id, actor);
       }
       // Grid movement mirrors committed positions; the viewer never advances simulation.
-      actor.setPosition(a.x * 40 + 20, a.y * 40 + 20);
+      const sharing = w.inhabitants.filter(other => other.x === a.x && other.y === a.y);
+      const index = sharing.findIndex(other => other.id === a.id);
+      const offsets = [[-9, -9], [9, 9], [-9, 9], [9, -9]];
+      const [dx, dy] = sharing.length > 1 ? offsets[index] : [0, 0];
+      actor.setPosition(a.x * 40 + 20 + dx, a.y * 40 + 20 + dy);
+      (actor.list[2] as Phaser.GameObjects.Text).setY(16 + (sharing.length > 1 ? index * 14 : 0));
       if (a.id === selected) this.selection.setPosition(actor.x, actor.y);
     }
   }

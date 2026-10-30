@@ -1,5 +1,9 @@
 # Spec — Governance v3 single-owner setup
 
+This setup is complete. The active product implementation contract is
+[The Living Valley — Prototype 0.1](docs/specs/living-valley-0.1.md), written and committed
+before product code under Paul's 29 October 2026 continuation authorization.
+
 ## Outcome
 
 A traceable installation of Paul's actual V3 governance with established solo-owner settings,
