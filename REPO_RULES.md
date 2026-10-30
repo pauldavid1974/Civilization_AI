@@ -151,6 +151,9 @@ changed by this PR. The base branch does not yet have the review-gate workflow o
 the first setup PR cannot claim that custom status is active. Paul reviews this bootstrap PR;
 after merge, verify the status on a subsequent PR before requiring it through remote settings.
 
+Later activation and verification evidence is recorded in `docs/governance-activation.md`.
+The initial setup observation above is historical, not a live claim about GitHub settings.
+
 The `governance/exact-head-review` status can optionally be produced by a dedicated, least-
 privilege GitHub App instead of the shared Actions identity every other check uses, so a required
 check can trust that one producer specifically. This needs a human owner to register the App,
