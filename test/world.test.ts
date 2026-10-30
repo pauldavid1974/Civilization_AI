@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createWorld, step, phase, day, parseAction, carried, type World, type Stock } from '../src/world.ts';
+import { createWorld, step, phase, day, parseAction, carried, nextStep, type World, type Stock } from '../src/world.ts';
 import { deterministicAgent, type Cognition, type Perception } from '../src/cognition.ts';
 
 function totals(w: World): Stock {
@@ -51,7 +51,7 @@ test('resources are conserved over five days, including consumption and conteste
 
 test('malformed, impossible and omniscient action proposals fail without physical changes', () => {
   for (const proposal of [null, { kind: 'invent', quantity: 999 }, { kind: 'explore', target: { x: NaN, y: 0 } },
-    { kind: 'explore', target: { x: 100, y: 0 } }, { kind: 'gather', target: 'imaginary' }]) {
+    { kind: 'explore', target: { x: 100, y: 0 } }, { kind: 'explore', target: { x: 0, y: 0 } }, { kind: 'gather', target: 'imaginary' }]) {
     const before = createWorld();
     const result = step(before, { name: 'invalid', propose: () => proposal });
     assert.ok(result.events.every(e => e.kind === 'rejected'));
@@ -81,9 +81,13 @@ test('personal evidence excludes distant truth and other minds and can change la
   const spy: Cognition = { name: 'spy', propose: p => { seen.push(p); return { kind: 'rest' }; } };
   step(w, spy);
   const ada = seen.find(p => p.self.id === 'ada')!;
-  assert.deepEqual(Object.keys(ada).sort(), ['height', 'home', 'observations', 'phase', 'self', 'tick', 'width']);
+  assert.deepEqual(Object.keys(ada).sort(), [
+    'height', 'home', 'landmarks', 'nearbyInhabitants', 'nearbyWildlife',
+    'observations', 'phase', 'self', 'tick', 'width',
+  ]);
   assert.equal(ada.observations.some(p => p.id === 'south-berries'), false);
   assert.equal('inhabitants' in ada, false);
+  assert.equal(ada.landmarks.length, 5);
   assert.deepEqual(deterministicAgent.propose(ada), { kind: 'gather', target: 'north-berries' });
   w.patches[0].quantity = 0;
   seen.length = 0; step(w, spy);
@@ -107,4 +111,107 @@ test('shared-store convention does not prohibit physical consumption by any inha
   a.plan = { action: { kind: 'eat' }, destination: { ...w.home }, remaining: 1 };
   const next = step(w).world;
   assert.equal(next.stock.berries, 0); assert.equal(next.consumed.berries, 1);
+});
+
+test('world landmarks are authoritative and perceived by inhabitants', () => {
+  const w = createWorld();
+  assert.equal(w.landmarks.length, 5);
+  const kinds = w.landmarks.map(l => l.kind).sort();
+  assert.deepEqual(kinds, ['commons', 'granary', 'shelter', 'shelter', 'workshop']);
+  const granary = w.landmarks.find(l => l.kind === 'granary')!;
+  assert.equal(granary.x, w.home.x);
+  assert.equal(granary.y, w.home.y);
+  assert.match(granary.name, /Windmill & Granary/);
+
+  // Inhabitant perception receives landmarks
+  let perceivedLandmarksCount = 0;
+  step(w, {
+    name: 'observer',
+    propose: p => {
+      perceivedLandmarksCount = p.landmarks.length;
+      return { kind: 'rest' };
+    },
+  });
+  assert.equal(perceivedLandmarksCount, 5);
+});
+
+test('terrain navigation respects blocked cells and routes via BFS', () => {
+  const blocked = new Set(['1,1']);
+  const start = { x: 1, y: 0 };
+  const dest = { x: 1, y: 2 };
+  // Direct path is blocked at (1, 1), so nextStep must navigate around
+  const step1 = nextStep(start, dest, 5, 5, blocked);
+  assert.notEqual(`${step1.x},${step1.y}`, '1,1', 'did not step into blocked cell');
+  assert.equal(step1.y, 0, 'moved horizontally around obstacle');
+
+  // Verify explore action rejected for blocked cell
+  const w = createWorld();
+  const res = step(w, { name: 'test', propose: () => ({ kind: 'explore', target: { x: 0, y: 0 } }) });
+  assert.equal(res.events[0].kind, 'rejected');
+});
+
+test('shelter rest affords enhanced energy recovery', () => {
+  const w = createWorld();
+  const shelter = w.landmarks.find(l => l.kind === 'shelter')!;
+  const a = w.inhabitants[0];
+  a.x = shelter.x; a.y = shelter.y; a.energy = 50;
+  a.plan = { action: { kind: 'rest' }, destination: { x: shelter.x, y: shelter.y }, remaining: 1 };
+  const next = step(w).world;
+  const updatedA = next.inhabitants.find(i => i.id === a.id)!;
+  // Enhanced shelter rest gives +35 energy (minus tick exertion)
+  assert.ok(updatedA.energy >= 84);
+});
+
+test('hungry inhabitants seek and consume shared food from village granary', () => {
+  const w = createWorld();
+  w.stock.berries = 10;
+  const ada = w.inhabitants[0];
+  ada.hunger = 70;
+  ada.inventory.berries = 0;
+  // Propose should choose eat even without carried food
+  const action = deterministicAgent.propose({
+    self: ada,
+    observations: ada.knowledge,
+    tick: 1,
+    phase: 'daylight',
+    width: w.width,
+    height: w.height,
+    home: w.home,
+    landmarks: w.landmarks,
+    nearbyInhabitants: [],
+    nearbyWildlife: [],
+  });
+  assert.deepEqual(action, { kind: 'eat' });
+});
+
+test('wildlife exists in meadow and is observed locally without omniscience', () => {
+  const w = createWorld();
+  assert.ok(w.critters && w.critters.length > 0);
+  const pippin = w.critters[0];
+  assert.equal(pippin.id, 'pippin');
+
+  let seenWildlifeCount = 0;
+  const cleo = w.inhabitants.find(i => i.id === 'cleo')!;
+  assert.ok(cleo);
+  // Cleo at (14, 7) is distance 7 from Pippin at (17, 11) -> out of perception radius 2
+  step(w, {
+    name: 'spy',
+    propose: p => {
+      if (p.self.id === 'cleo') seenWildlifeCount = p.nearbyWildlife.length;
+      return { kind: 'rest' };
+    },
+  });
+  assert.equal(seenWildlifeCount, 0, 'far inhabitant cannot see critter');
+
+  // Place Cleo within radius 2
+  w.inhabitants[2].x = 16;
+  w.inhabitants[2].y = 11;
+  step(w, {
+    name: 'spy',
+    propose: p => {
+      if (p.self.id === 'cleo') seenWildlifeCount = p.nearbyWildlife.length;
+      return { kind: 'rest' };
+    },
+  });
+  assert.equal(seenWildlifeCount, 1, 'nearby inhabitant observes critter locally');
 });

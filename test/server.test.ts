@@ -24,8 +24,9 @@ test('HTTP observer stays responsive while world advances with no viewers and af
     await delay(160);
     assert.ok(runtime.store.world.tick >= 2, 'simulation started before any browser connected');
     const response = await fetch(`${runtime.url}/api/world`);
-    const first = await response.json() as { world: { tick: number; inhabitants: unknown[] } };
+    const first = await response.json() as { world: { tick: number; inhabitants: unknown[]; landmarks: unknown[] } };
     assert.equal(first.world.inhabitants.length, 4);
+    assert.equal(first.world.landmarks.length, 5);
     await delay(150);
     const last = await (await fetch(`${runtime.url}/api/world`)).json() as typeof first;
     assert.ok(last.world.tick > first.world.tick);
@@ -37,6 +38,20 @@ test('HTTP observer stays responsive while world advances with no viewers and af
     assert.equal(status, 403);
     const tick = runtime.store.world.tick;
     await delay(90); assert.ok(runtime.store.world.tick > tick, 'no viewer required');
+  } finally { await runtime.stop(); }
+});
+
+test('server safely serves static assets and rejects traversal', async () => {
+  const runtime = await startRuntime({ path: ':memory:', port: 0, tickMs: 30, viewerDir: 'viewer' });
+  try {
+    const res = await fetch(`${runtime.url}/assets/Pocket%20Village%20Read%20Me.txt`);
+    assert.equal(res.status, 200);
+    const body = await res.text();
+    assert.match(body, /SebbySpoons/);
+
+    // Traversal rejection
+    const bad = await fetch(`${runtime.url}/assets/..%2f..%2fpackage.json`);
+    assert.ok(bad.status === 403 || bad.status === 404);
   } finally { await runtime.stop(); }
 });
 

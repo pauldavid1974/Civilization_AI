@@ -1,67 +1,274 @@
 import Phaser from 'phaser';
 import type { Inhabitant, World, WorldEvent } from '../src/world.ts';
 
-type Snapshot = { world: World; events: WorldEvent[]; day: number; phase: string; cognition: string };
+type Snapshot = {
+  world: World;
+  events: WorldEvent[];
+  day: number;
+  phase: string;
+  cognition: string;
+};
+
 let snapshot: Snapshot | undefined;
-let selected = 'ada';
+let selectedId = 'ada';
+let selectedCategory: 'inhabitant' | 'landmark' | 'critter' = 'inhabitant';
+
 const element = (id: string) => document.getElementById(id)!;
-const text = (id: string, value: string) => { element(id).textContent = value; };
-const buttons = new Map<string, HTMLButtonElement>();
-const actionText = (a: Inhabitant) => {
+const text = (id: string, value: string) => {
+  const el = document.getElementById(id);
+  if (el) el.textContent = value;
+};
+
+const inhabitantButtons = new Map<string, HTMLButtonElement>();
+const landmarkButtons = new Map<string, HTMLButtonElement>();
+
+const actionEmoji = (kind: string) => {
+  switch (kind) {
+    case 'gather': return '🍇';
+    case 'deposit': return '📦';
+    case 'eat': return '🍞';
+    case 'rest': return '💤';
+    case 'explore': return '🧭';
+    default: return '💭';
+  }
+};
+
+const actionLabel = (a: Inhabitant) => {
   if (!a.plan) return 'Considering the next opportunity';
   const moving = a.x !== a.plan.destination.x || a.y !== a.plan.destination.y;
-  const labels = { gather: 'Gathering', deposit: 'Taking resources to the store',
-    eat: 'Eating', rest: 'Resting', explore: 'Exploring' };
-  return moving ? `Walking to ${a.plan.destination.x}, ${a.plan.destination.y}` : labels[a.plan.action.kind];
+  const labels: Record<string, string> = {
+    gather: 'Gathering resources',
+    deposit: 'Taking supplies to the granary',
+    eat: 'Eating sustenance',
+    rest: 'Resting to recover energy',
+    explore: 'Exploring unvisited valley territory',
+  };
+  const base = labels[a.plan.action.kind] ?? 'Acting';
+  return moving ? `Walking to (${a.plan.destination.x}, ${a.plan.destination.y}) · ${base}` : base;
 };
+
+function selectEntity(id: string, category: 'inhabitant' | 'landmark' | 'critter') {
+  selectedId = id;
+  selectedCategory = category;
+  renderInspector();
+}
 
 function renderInspector(): void {
   if (!snapshot) return;
   const w = snapshot.world;
-  const a = w.inhabitants.find(a => a.id === selected)!;
+
+  // Update button pressed states
+  for (const [id, btn] of inhabitantButtons) {
+    btn.setAttribute('aria-pressed', String(selectedCategory !== 'landmark' && id === selectedId));
+  }
+  for (const [id, btn] of landmarkButtons) {
+    btn.setAttribute('aria-pressed', String(selectedCategory === 'landmark' && id === selectedId));
+  }
+
+  const badgeEl = element('badge');
+  const metersEl = element('meters');
+  const detailsEl = element('details');
+  const knowledgeEl = element('knowledge');
+  const knowledgeHeading = element('knowledge-heading');
+  const knowledgeSub = element('knowledge-sub');
+
+  if (selectedCategory === 'landmark') {
+    const landmark = w.landmarks?.find(l => l.id === selectedId) ?? w.landmarks?.[0];
+    if (!landmark) return;
+
+    badgeEl.textContent = landmark.kind.toUpperCase();
+    text('name', landmark.name);
+    text('goal', landmark.description);
+    text('action', `Authoritative location at (${landmark.x}, ${landmark.y})`);
+
+    metersEl.replaceChildren();
+    detailsEl.replaceChildren();
+
+    // Check who is currently at or near this landmark
+    const occupants = w.inhabitants.filter(a => Math.abs(a.x - landmark.x) + Math.abs(a.y - landmark.y) <= 1);
+    const occupantNames = occupants.length ? occupants.map(o => o.name).join(', ') : 'None currently present';
+
+    const items: [string, string][] = [
+      ['Coordinates', `${landmark.x}, ${landmark.y}`],
+      ['Landmark type', landmark.kind],
+      ['Present inhabitants', occupantNames],
+      ['Village purpose', landmark.description],
+    ];
+
+    if (landmark.kind === 'granary') {
+      items.push(
+        ['Stored food', `${w.stock.berries} berries`],
+        ['Stored timber', `${w.stock.wood} wood`],
+        ['Total consumed', `${w.consumed.berries} berries eaten`],
+      );
+    }
+
+    for (const [label, val] of items) {
+      const dt = document.createElement('dt'); dt.textContent = label;
+      const dd = document.createElement('dd'); dd.textContent = val;
+      detailsEl.append(dt, dd);
+    }
+
+    knowledgeHeading.textContent = 'Landmark history & occupants';
+    knowledgeSub.textContent = 'Permanent village fixture persisted in SQLite world state.';
+    knowledgeEl.replaceChildren();
+    if (occupants.length) {
+      for (const occ of occupants) {
+        const li = document.createElement('li');
+        li.textContent = `${occ.name} is resting or working here (Energy: ${Math.round(occ.energy)}%, Hunger: ${Math.round(occ.hunger)}%)`;
+        knowledgeEl.append(li);
+      }
+    } else {
+      const li = document.createElement('li');
+      li.textContent = 'Quiet at the moment. Inhabitants visit during their daily routines.';
+      knowledgeEl.append(li);
+    }
+    return;
+  }
+
+  if (selectedId === 'pippin') {
+    const critter = w.critters?.find(c => c.id === 'pippin');
+    badgeEl.textContent = 'VALLEY FAUNA';
+    text('name', 'Pippin the Meadow Slime');
+    text('goal', 'A gentle, peaceful valley creature that hops quietly in the southeastern wildflower pasture.');
+    text('action', critter ? `Hopping cheerfully near (${critter.x}, ${critter.y})` : 'Roaming the meadow');
+
+    metersEl.replaceChildren();
+    detailsEl.replaceChildren();
+    for (const [label, val] of [
+      ['Species', 'Orange Meadow Slime'],
+      ['Temperament', 'Friendly & peaceful'],
+      ['Coordinates', critter ? `${critter.x}, ${critter.y}` : 'Unknown'],
+      ['Facing', critter?.facing ?? 'front'],
+    ]) {
+      const dt = document.createElement('dt'); dt.textContent = label;
+      const dd = document.createElement('dd'); dd.textContent = val;
+      detailsEl.append(dt, dd);
+    }
+
+    knowledgeHeading.textContent = 'Fauna notes';
+    knowledgeSub.textContent = 'Inhabitants who wander within 2 tiles perceive Pippin in their local observations.';
+    knowledgeEl.replaceChildren();
+    const li = document.createElement('li');
+    li.textContent = 'Valley residents see Pippin as a welcome sign of living nature in the valley.';
+    knowledgeEl.append(li);
+    return;
+  }
+
+  // Inhabitant inspector
+  const a = w.inhabitants.find(a => a.id === selectedId) ?? w.inhabitants[0];
+  badgeEl.textContent = 'INHABITANT';
   text('name', a.name);
-  text('goal', `Prefers gathering ${a.preference}; hunger and rest can change the next choice.`);
-  text('action', actionText(a));
-  const details = element('details'); details.replaceChildren();
-  for (const [label, value] of [
+  text('goal', `Prefers gathering ${a.preference}; hunger, energy, and day/night cycle guide decisions.`);
+  text('action', actionLabel(a));
+
+  // Render Hunger and Energy meters
+  metersEl.replaceChildren();
+  for (const [name, val, cls] of [
+    ['Hunger', a.hunger, 'hunger'],
+    ['Energy', a.energy, 'energy'],
+  ] as const) {
+    const row = document.createElement('div'); row.className = 'meter-row';
+    const label = document.createElement('span'); label.textContent = name;
+    const bar = document.createElement('div'); bar.className = 'meter-bar';
+    const fill = document.createElement('div');
+    fill.className = `meter-fill ${cls}`;
+    fill.style.width = `${Math.min(100, Math.max(0, val))}%`;
+    bar.append(fill);
+    const num = document.createElement('span'); num.textContent = `${Math.round(val)}%`;
+    row.append(label, bar, num);
+    metersEl.append(row);
+  }
+
+  detailsEl.replaceChildren();
+  for (const [label, val] of [
+    ['Coordinates', `${a.x}, ${a.y}`],
     ['Carrying', `${a.inventory.berries} berries, ${a.inventory.wood} wood`],
-    ['Hunger', `${Math.round(a.hunger)} / 100`], ['Energy', `${Math.round(a.energy)} / 100`],
-    ['Completed actions', String(a.completed)], ['Decision opportunities', String(a.opportunities)],
+    ['Completed actions', String(a.completed)],
+    ['Decision opportunities', String(a.opportunities)],
+    ['Visited locations', `${a.visited.length} tiles recorded`],
   ]) {
     const dt = document.createElement('dt'); dt.textContent = label;
-    const dd = document.createElement('dd'); dd.textContent = value; details.append(dt, dd);
+    const dd = document.createElement('dd'); dd.textContent = val;
+    detailsEl.append(dt, dd);
   }
-  const knowledge = element('knowledge'); knowledge.replaceChildren();
+
+  knowledgeHeading.textContent = 'Personal observations & memory';
+  knowledgeSub.textContent = 'Evidence witnessed firsthand (Manhattan radius 2). Personal memory may become stale as reality changes.';
+  knowledgeEl.replaceChildren();
   for (const k of a.knowledge) {
     const li = document.createElement('li');
-    li.textContent = `${k.resource} at ${k.x}, ${k.y}: ${k.quantity} last seen at tick ${k.observedAt}`;
-    knowledge.append(li);
+    li.textContent = `${k.resource} patch at (${k.x}, ${k.y}): ${k.quantity} remaining (seen at tick ${k.observedAt})`;
+    knowledgeEl.append(li);
   }
-  if (!a.knowledge.length) { const li = document.createElement('li'); li.textContent = 'No resource patches seen yet.'; knowledge.append(li); }
-  for (const [id, button] of buttons) button.setAttribute('aria-pressed', String(id === selected));
+  if (!a.knowledge.length) {
+    const li = document.createElement('li');
+    li.textContent = 'No resource patches seen yet. Exploring territory to discover food and timber.';
+    knowledgeEl.append(li);
+  }
 }
 
 function renderPage(): void {
   if (!snapshot) return;
   const w = snapshot.world;
-  text('time', `Day ${snapshot.day} · ${snapshot.phase} · ${w.tick}s`);
-  text('stock', `${w.stock.berries} berries · ${w.stock.wood} wood stored · ${w.consumed.berries} berries eaten`);
-  if (!buttons.size) {
+  text('time', `Day ${snapshot.day} · ${snapshot.phase.toUpperCase()} · Tick ${w.tick}s`);
+  text('stock', `${w.stock.berries} berries · ${w.stock.wood} wood stored in granary · ${w.consumed.berries} total berries consumed`);
+
+  // Build inhabitant navigation buttons once
+  if (!inhabitantButtons.size) {
+    const container = element('inhabitants');
     for (const a of w.inhabitants) {
-      const button = document.createElement('button'); button.type = 'button';
-      const dot = document.createElement('span'); dot.className = 'dot'; dot.style.background = a.color;
-      dot.setAttribute('aria-hidden', 'true'); button.append(dot, a.name);
-      button.addEventListener('click', () => { selected = a.id; renderInspector(); });
-      element('inhabitants').append(button); buttons.set(a.id, button);
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      const dot = document.createElement('span');
+      dot.className = 'dot';
+      dot.style.background = a.color;
+      dot.setAttribute('aria-hidden', 'true');
+      btn.append(dot, a.name);
+      btn.addEventListener('click', () => selectEntity(a.id, 'inhabitant'));
+      container.append(btn);
+      inhabitantButtons.set(a.id, btn);
+    }
+    // Pippin the slime button
+    const slimeBtn = document.createElement('button');
+    slimeBtn.type = 'button';
+    const slimeDot = document.createElement('span');
+    slimeDot.className = 'dot';
+    slimeDot.style.background = '#e88938';
+    slimeDot.setAttribute('aria-hidden', 'true');
+    slimeBtn.append(slimeDot, 'Pippin (Fauna)');
+    slimeBtn.addEventListener('click', () => selectEntity('pippin', 'critter'));
+    container.append(slimeBtn);
+    inhabitantButtons.set('pippin', slimeBtn);
+  }
+
+  // Build landmark navigation buttons once
+  if (!landmarkButtons.size && w.landmarks) {
+    const container = element('landmarks');
+    for (const l of w.landmarks) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      const icon = l.kind === 'granary' ? '🌾 ' : l.kind === 'shelter' ? '🏡 ' : l.kind === 'commons' ? '⛲ ' : '⚒️ ';
+      btn.textContent = `${icon}${l.name}`;
+      btn.addEventListener('click', () => selectEntity(l.id, 'landmark'));
+      container.append(btn);
+      landmarkButtons.set(l.id, btn);
     }
   }
+
   renderInspector();
-  const events = element('events'); events.replaceChildren();
+
+  // Render recent event journal
+  const eventsEl = element('events');
+  eventsEl.replaceChildren();
   for (const e of [...snapshot.events].reverse().slice(0, 16)) {
     const li = document.createElement('li');
-    const time = document.createElement('span'); time.className = 'tick'; time.textContent = `Tick ${e.tick}`;
+    const time = document.createElement('span');
+    time.className = 'tick';
+    time.textContent = `Tick ${e.tick}`;
     const actor = w.inhabitants.find(a => a.id === e.actor)?.name ?? e.actor;
-    li.append(time, `${actor} ${e.kind === 'rejected' ? 'could not act: ' : ''}${e.detail}`); events.append(li);
+    li.append(time, `${actor} ${e.kind === 'rejected' ? 'could not act: ' : ''}${e.detail}`);
+    eventsEl.append(li);
   }
 }
 
@@ -70,89 +277,545 @@ async function poll(): Promise<void> {
     const response = await fetch('/api/world', { signal: AbortSignal.timeout(2000), cache: 'no-store' });
     if (!response.ok) throw Error('connection');
     snapshot = await response.json() as Snapshot;
-    renderPage(); text('connection', 'Watching live'); element('connection').classList.remove('error');
+    renderPage();
+    text('connection', 'Watching live');
+    element('connection').classList.remove('error');
   } catch {
-    text('connection', 'Disconnected · showing last observation. Retrying…'); element('connection').classList.add('error');
-  } finally { setTimeout(() => { void poll(); }, 500); }
+    text('connection', 'Disconnected · showing last observation. Retrying…');
+    element('connection').classList.add('error');
+  } finally {
+    setTimeout(() => { void poll(); }, 500);
+  }
 }
 
 class ValleyScene extends Phaser.Scene {
-  private terrain!: Phaser.GameObjects.Graphics;
+  private terrainGfx!: Phaser.GameObjects.Graphics;
+  private windmillBlade!: Phaser.GameObjects.Sprite;
+  private campfireLight!: Phaser.GameObjects.Arc;
   private actors = new Map<string, Phaser.GameObjects.Container>();
+  private critterSprite?: Phaser.GameObjects.Sprite;
   private resources = new Map<string, Phaser.GameObjects.Text>();
   private night!: Phaser.GameObjects.Rectangle;
   private selection!: Phaser.GameObjects.Arc;
+  private bubbles = new Map<string, Phaser.GameObjects.Text>();
+
+  preload(): void {
+    // Load Pocket Village 16x16 tilesets and spritesheets
+    this.load.image('ground', '/assets/Tilesets/Ground Tiles.png');
+    this.load.image('buildings', '/assets/Tilesets/PreMade Buildings.png');
+    this.load.image('props', '/assets/Tilesets/Building Props.png');
+    this.load.image('decor', '/assets/Tilesets/Decor.png');
+    this.load.image('shadows', '/assets/Tilesets/Shadows.png');
+
+    // 16-frame 144x112 animated windmill blades
+    this.load.spritesheet('windmill', '/assets/Tilesets/WindmillBlade-Animation.png', {
+      frameWidth: 144,
+      frameHeight: 112,
+    });
+
+    // Pocket Hero 48x48 animated character sheets
+    this.load.spritesheet('hero-idle', '/assets/Pocket Hero/48x48 Idle - Hero-Sheet.png', {
+      frameWidth: 48,
+      frameHeight: 48,
+    });
+    this.load.spritesheet('hero-run', '/assets/Pocket Hero/48x48 Run - Hero-Sheet.png', {
+      frameWidth: 48,
+      frameHeight: 48,
+    });
+    this.load.spritesheet('hero-attack', '/assets/Pocket Hero/48x48 Attack - Hero-Sheet.png', {
+      frameWidth: 48,
+      frameHeight: 48,
+    });
+
+    // Wildlife / critter sheet
+    this.load.spritesheet('slime-front', '/assets/Enemy/slime_Orange_front-Sheet.png', {
+      frameWidth: 32,
+      frameHeight: 32,
+    });
+  }
 
   create(): void {
-    const g = this.add.graphics(); this.terrain = g;
-    g.fillStyle(0x77985a); g.fillRect(0, 0, 800, 560);
-    // Original vector terrain. These shapes are visual ground cover, not physical obstacles.
-    for (let y = 0; y < 14; y++) for (let x = 0; x < 20; x++) {
-      const tone = (x * 13 + y * 7) % 5;
-      g.fillStyle([0x829f62, 0x749455, 0x79995b, 0x7d9b60, 0x76915a][tone], 0.75);
-      g.fillRoundedRect(x * 40 + 2, y * 40 + 2, 36, 36, 9);
-      g.fillStyle(0xa7b87b, 0.6); g.fillCircle(x * 40 + 9, y * 40 + 26, 2);
+    // Setup animation states
+    if (!this.anims.exists('spin-windmill')) {
+      this.anims.create({
+        key: 'spin-windmill',
+        frames: this.anims.generateFrameNumbers('windmill', { start: 0, end: 15 }),
+        frameRate: 10,
+        repeat: -1,
+      });
     }
-    // Valley edge stream sits outside the walkable cell centers.
-    g.lineStyle(12, 0x619da6, 0.9); g.beginPath(); g.moveTo(1, 0);
-    for (let y = 0; y <= 560; y += 20) g.lineTo(4 + Math.sin(y / 75) * 3, y);
-    g.strokePath();
-    this.add.text(32, 18, 'The valley', { fontFamily: 'Georgia', fontSize: '24px', color: '#233f38' });
-    this.night = this.add.rectangle(400, 280, 800, 560, 0x172942, 0).setDepth(5);
-    this.selection = this.add.circle(0, 0, 16).setStrokeStyle(2, 0xffffff).setDepth(8);
+    if (!this.anims.exists('hero-idle-anim')) {
+      this.anims.create({
+        key: 'hero-idle-anim',
+        frames: this.anims.generateFrameNumbers('hero-idle', { start: 0, end: 11 }),
+        frameRate: 6,
+        repeat: -1,
+      });
+    }
+    if (!this.anims.exists('hero-run-anim')) {
+      this.anims.create({
+        key: 'hero-run-anim',
+        frames: this.anims.generateFrameNumbers('hero-run', { start: 0, end: 17 }),
+        frameRate: 12,
+        repeat: -1,
+      });
+    }
+    if (!this.anims.exists('hero-work-anim')) {
+      this.anims.create({
+        key: 'hero-work-anim',
+        frames: this.anims.generateFrameNumbers('hero-attack', { start: 0, end: 13 }),
+        frameRate: 10,
+        repeat: -1,
+      });
+    }
+    if (!this.anims.exists('slime-hop')) {
+      this.anims.create({
+        key: 'slime-hop',
+        frames: this.anims.generateFrameNumbers('slime-front', { start: 0, end: 7 }),
+        frameRate: 6,
+        repeat: -1,
+      });
+    }
+
+    const g = this.add.graphics();
+    this.terrainGfx = g;
+
+    // Render 20x14 cell base landscape
+    for (let y = 0; y < 14; y++) {
+      for (let x = 0; x < 20; x++) {
+        const px = x * 40;
+        const py = y * 40;
+
+        // River stream down column 0, with wooden bridge at y=6
+        if (x === 0) {
+          if (y === 6) {
+            g.fillStyle(0x7c5432, 1);
+            g.fillRect(px, py + 8, 40, 24);
+            g.fillStyle(0x56381e, 1);
+            g.fillRect(px, py + 6, 40, 3);
+            g.fillRect(px, py + 31, 40, 3);
+          } else {
+            g.fillStyle(0x477891, 0.95);
+            g.fillRect(px, py, 40, 40);
+            g.fillStyle(0x73a8c2, 0.7);
+            g.fillRect(px + 4, py + 8 + (y * 5) % 20, 28, 4);
+          }
+          continue;
+        }
+
+        // Riverbank transition
+        if (x === 1) {
+          g.fillStyle(0x60874e, 1);
+          g.fillRect(px, py, 40, 40);
+          g.fillStyle(0x355b6b, 0.5);
+          g.fillRect(px, py, 4, 40);
+          continue;
+        }
+
+        // Farmland soil plots around (14..16, 8..9)
+        if (x >= 14 && x <= 16 && y >= 8 && y <= 9) {
+          g.fillStyle(0x543c2c, 1);
+          g.fillRect(px + 1, py + 1, 38, 38);
+          g.fillStyle(0x3b2a1f, 0.7);
+          for (let row = 6; row < 36; row += 10) g.fillRect(px + 3, py + row, 34, 3);
+          g.fillStyle(0x589445, 0.9);
+          g.fillCircle(px + 10, py + 18, 3);
+          g.fillCircle(px + 24, py + 28, 3);
+          continue;
+        }
+
+        // Dirt paths connecting bridge, cottages, granary, and workshop
+        const isPath = (y === 6 && x >= 1 && x <= 4)
+          || (x === 5 && y >= 4 && y <= 6)
+          || (y === 5 && x >= 5 && x <= 9)
+          || (x === 9 && y >= 5 && y <= 7)
+          || (y === 7 && x >= 9 && x <= 15)
+          || (x === 12 && y === 6);
+
+        if (isPath) {
+          g.fillStyle(0x94714e, 1);
+          g.fillRect(px + 2, py + 2, 36, 36);
+          g.fillStyle(0xab8865, 0.8);
+          g.fillCircle(px + 12, py + 14, 2);
+          g.fillCircle(px + 26, py + 24, 2);
+          continue;
+        }
+
+        // Cliff ridges at NW and NE corners
+        if ((x === 1 && y === 0) || (x >= 18 && y <= 1)) {
+          g.fillStyle(0x64696c, 1);
+          g.fillRect(px + 2, py + 2, 36, 36);
+          g.fillStyle(0x4c5053, 0.8);
+          g.fillRect(px + 4, py + 24, 32, 12);
+          continue;
+        }
+
+        // Lush green meadow grass with subtle variations
+        const tone = (x * 17 + y * 11) % 4;
+        const grassColors = [0x6c944d, 0x648c46, 0x729c52, 0x5e8540];
+        g.fillStyle(grassColors[tone], 1);
+        g.fillRect(px, py, 40, 40);
+
+        // Wildflower and grass tufts
+        if ((x + y * 3) % 5 === 0) {
+          g.fillStyle(0x9cb865, 0.7);
+          g.fillRect(px + 8, py + 12, 3, 6);
+          g.fillRect(px + 12, py + 10, 3, 8);
+        } else if ((x * 2 + y) % 7 === 0) {
+          g.fillStyle(0xdfba5a, 0.9);
+          g.fillCircle(px + 24, py + 20, 2);
+        }
+      }
+    }
+
+    // Render permanent landmark structures
+    this.renderLandmarkVisuals();
+
+    // Night lighting overlay and cozy campfire glow
+    this.night = this.add.rectangle(400, 280, 800, 560, 0x142136, 0).setDepth(8);
+    this.campfireLight = this.add.circle(8 * 40 + 20, 5 * 40 + 20, 32, 0xf7b85e, 0).setDepth(9);
+
+    // Selection ring
+    this.selection = this.add.circle(0, 0, 18).setStrokeStyle(2.5, 0xffffff, 0.95).setDepth(12);
+
+    // Title label
+    this.add.text(28, 12, 'The Living Valley', {
+      fontFamily: 'Georgia, serif',
+      fontSize: '20px',
+      color: '#1a332c',
+      backgroundColor: '#edf3efcc',
+      padding: { x: 8, y: 3 },
+    }).setDepth(15);
+  }
+
+  private renderLandmarkVisuals(): void {
+    const g = this.terrainGfx;
+
+    // 1. Pioneer's Cottage at (5, 4)
+    const cwX = 5 * 40 + 20;
+    const cwY = 4 * 40 + 20;
+    // Ground shadow
+    g.fillStyle(0x000000, 0.2);
+    g.fillEllipse(cwX, cwY + 16, 56, 18);
+    // Timber cottage walls
+    g.fillStyle(0x765239, 1);
+    g.fillRect(cwX - 24, cwY - 20, 48, 36);
+    // Thatched roof
+    g.fillStyle(0xb58e49, 1);
+    g.fillTriangle(cwX, cwY - 38, cwX - 28, cwY - 14, cwX + 28, cwY - 14);
+    // Stone chimney
+    g.fillStyle(0x5a5d61, 1);
+    g.fillRect(cwX + 12, cwY - 36, 8, 16);
+    // Cozy doorway & warm window
+    g.fillStyle(0x382214, 1);
+    g.fillRect(cwX - 6, cwY + 2, 12, 14);
+    g.fillStyle(0xf5d97a, 0.9);
+    g.fillRect(cwX + 10, cwY - 8, 8, 8);
+
+    const cottageWestText = this.add.text(cwX, cwY - 44, "Pioneer's Cottage", {
+      fontFamily: 'Segoe UI, sans-serif',
+      fontSize: '12px',
+      color: '#233f38',
+      backgroundColor: '#edf3efdd',
+      padding: { x: 4, y: 1 },
+    }).setOrigin(0.5).setDepth(7).setInteractive({ useHandCursor: true });
+    cottageWestText.on('pointerdown', () => selectEntity('cottage-west', 'landmark'));
+
+    // 2. Valley Haven Cottage at (15, 7)
+    const ceX = 15 * 40 + 20;
+    const ceY = 7 * 40 + 20;
+    g.fillStyle(0x000000, 0.2);
+    g.fillEllipse(ceX, ceY + 16, 56, 18);
+    g.fillStyle(0x6e4a32, 1);
+    g.fillRect(ceX - 24, ceY - 20, 48, 36);
+    g.fillStyle(0xa1523e, 1);
+    g.fillTriangle(ceX, ceY - 38, ceX - 28, ceY - 14, ceX + 28, ceY - 14);
+    g.fillStyle(0x382214, 1);
+    g.fillRect(ceX - 6, ceY + 2, 12, 14);
+    g.fillStyle(0xf5d97a, 0.9);
+    g.fillRect(ceX - 18, ceY - 8, 8, 8);
+
+    const cottageEastText = this.add.text(ceX, ceY - 44, 'Valley Haven', {
+      fontFamily: 'Segoe UI, sans-serif',
+      fontSize: '12px',
+      color: '#233f38',
+      backgroundColor: '#edf3efdd',
+      padding: { x: 4, y: 1 },
+    }).setOrigin(0.5).setDepth(7).setInteractive({ useHandCursor: true });
+    cottageEastText.on('pointerdown', () => selectEntity('cottage-east', 'landmark'));
+
+    // 3. Commons & Campfire Plaza at (9, 5) & (8, 5)
+    const comX = 9 * 40 + 20;
+    const comY = 5 * 40 + 20;
+    // Circular stone paved plaza
+    g.fillStyle(0x8f938d, 0.7);
+    g.fillCircle(comX, comY, 26);
+    // Stone water well
+    g.fillStyle(0x525654, 1);
+    g.fillCircle(comX, comY, 14);
+    g.fillStyle(0x436f87, 1);
+    g.fillCircle(comX, comY, 9);
+    g.fillStyle(0x704829, 1);
+    g.fillRect(comX - 11, comY - 14, 4, 16);
+    g.fillRect(comX + 7, comY - 14, 4, 16);
+    g.fillRect(comX - 13, comY - 16, 26, 4);
+
+    // Campfire at (8, 5)
+    const fireX = 8 * 40 + 20;
+    const fireY = 5 * 40 + 20;
+    g.fillStyle(0x523d2e, 1);
+    g.fillCircle(fireX, fireY, 12);
+    g.fillStyle(0xd9572b, 0.95);
+    g.fillTriangle(fireX, fireY - 10, fireX - 6, fireY + 4, fireX + 6, fireY + 4);
+    g.fillStyle(0xf7c443, 0.95);
+    g.fillTriangle(fireX, fireY - 6, fireX - 4, fireY + 2, fireX + 4, fireY + 2);
+
+    const commonsText = this.add.text(comX - 20, comY - 32, 'Commons & Well', {
+      fontFamily: 'Segoe UI, sans-serif',
+      fontSize: '12px',
+      color: '#233f38',
+      backgroundColor: '#edf3efdd',
+      padding: { x: 4, y: 1 },
+    }).setOrigin(0.5).setDepth(7).setInteractive({ useHandCursor: true });
+    commonsText.on('pointerdown', () => selectEntity('commons', 'landmark'));
+
+    // 4. Valley Workshop at (12, 7)
+    const wsX = 12 * 40 + 20;
+    const wsY = 7 * 40 + 20;
+    g.fillStyle(0x000000, 0.2);
+    g.fillEllipse(wsX, wsY + 16, 50, 16);
+    g.fillStyle(0x695038, 1);
+    g.fillRect(wsX - 20, wsY - 14, 40, 28);
+    g.fillStyle(0x443020, 1);
+    g.fillRect(wsX - 24, wsY - 22, 48, 10);
+    // Workbench & anvil prop
+    g.fillStyle(0x8c6239, 1);
+    g.fillRect(wsX - 16, wsY + 4, 20, 8);
+    g.fillStyle(0x3e4247, 1);
+    g.fillRect(wsX + 6, wsY + 4, 10, 8);
+
+    const workshopText = this.add.text(wsX, wsY - 32, 'Workshop', {
+      fontFamily: 'Segoe UI, sans-serif',
+      fontSize: '12px',
+      color: '#233f38',
+      backgroundColor: '#edf3efdd',
+      padding: { x: 4, y: 1 },
+    }).setOrigin(0.5).setDepth(7).setInteractive({ useHandCursor: true });
+    workshopText.on('pointerdown', () => selectEntity('workshop', 'landmark'));
+
+    // 5. Village Windmill & Granary at (9, 7)
+    const wmX = 9 * 40 + 20;
+    const wmY = 7 * 40 + 16;
+    // Ground shadow
+    g.fillStyle(0x000000, 0.25);
+    g.fillEllipse(wmX, wmY + 20, 60, 20);
+    // Stone mill tower body
+    g.fillStyle(0x84888a, 1);
+    g.fillRect(wmX - 22, wmY - 32, 44, 50);
+    // Wooden trim & roof cap
+    g.fillStyle(0x5d412d, 1);
+    g.fillRect(wmX - 26, wmY - 38, 52, 8);
+    g.fillStyle(0x8c3d2e, 1);
+    g.fillTriangle(wmX, wmY - 56, wmX - 24, wmY - 38, wmX + 24, wmY - 38);
+    // Granary double doors
+    g.fillStyle(0x3b2416, 1);
+    g.fillRect(wmX - 10, wmY + 2, 20, 16);
+    // Grain sacks & crates
+    g.fillStyle(0xccaf78, 1);
+    g.fillCircle(wmX - 16, wmY + 12, 5);
+    g.fillCircle(wmX + 16, wmY + 12, 5);
+
+    // Animated Windmill Blades
+    this.windmillBlade = this.add.sprite(wmX, wmY - 42, 'windmill')
+      .setDepth(6)
+      .setScale(0.55);
+    this.windmillBlade.play('spin-windmill');
+
+    const granaryText = this.add.text(wmX, wmY + 28, 'Windmill & Granary', {
+      fontFamily: 'Segoe UI, sans-serif',
+      fontSize: '12px',
+      fontStyle: 'bold',
+      color: '#233f38',
+      backgroundColor: '#edf3efdd',
+      padding: { x: 4, y: 1 },
+    }).setOrigin(0.5).setDepth(7).setInteractive({ useHandCursor: true });
+    granaryText.on('pointerdown', () => selectEntity('granary', 'landmark'));
   }
 
   update(): void {
     if (!snapshot) return;
     const w = snapshot.world;
-    this.night.setAlpha(snapshot.phase === 'night' ? 0.42 : 0);
+
+    // Smooth day/night lighting transition
+    const targetAlpha = snapshot.phase === 'night' ? 0.45 : 0;
+    this.night.alpha = Phaser.Math.Linear(this.night.alpha, targetAlpha, 0.08);
+    this.campfireLight.alpha = snapshot.phase === 'night' ? 0.28 : 0;
+
+    // Render / update resource nodes
     if (!this.resources.size) {
-      const g = this.terrain;
-      g.fillStyle(0xb6b9aa); g.fillRoundedRect(w.home.x * 40 - 5, w.home.y * 40 - 5, 50, 50, 8);
-      this.add.text(w.home.x * 40 + 20, w.home.y * 40 + 47, 'Store',
-        { fontFamily: 'Segoe UI', fontSize: '14px', color: '#233f38' }).setOrigin(0.5);
+      const g = this.terrainGfx;
       for (const p of w.patches) {
-        const x = p.x * 40 + 20, y = p.y * 40 + 20;
+        const x = p.x * 40 + 20;
+        const y = p.y * 40 + 20;
         if (p.resource === 'wood') {
-          g.fillStyle(0x65513e); g.fillRect(x - 3, y, 6, 20);
-          g.fillStyle(0x355c45); g.fillTriangle(x, y - 27, x - 22, y + 8, x + 22, y + 8);
+          // Pine and oak timber grove
+          g.fillStyle(0x000000, 0.2);
+          g.fillEllipse(x, y + 14, 38, 14);
+          g.fillStyle(0x5a3d28, 1);
+          g.fillRect(x - 3, y - 2, 6, 18);
+          g.fillStyle(0x28593a, 1);
+          g.fillTriangle(x, y - 30, x - 18, y + 4, x + 18, y + 4);
+          g.fillStyle(0x356e49, 1);
+          g.fillTriangle(x, y - 22, x - 14, y + 4, x + 14, y + 4);
         } else {
-          g.fillStyle(0x47693e); g.fillCircle(x, y, 19); g.fillStyle(0xb35c78);
-          for (const [dx, dy] of [[-8, 1], [4, -8], [9, 7]]) g.fillCircle(x + dx, y + dy, 4);
+          // Lush berry bushes with juicy fruit clusters
+          g.fillStyle(0x000000, 0.2);
+          g.fillEllipse(x, y + 12, 36, 12);
+          g.fillStyle(0x3d6e38, 1);
+          g.fillCircle(x, y, 16);
+          g.fillStyle(0x4a8244, 1);
+          g.fillCircle(x - 4, y - 3, 11);
+          g.fillStyle(0xba324b, 1);
+          for (const [dx, dy] of [[-6, 1], [4, -6], [7, 5], [-2, 8]]) {
+            g.fillCircle(x + dx, y + dy, 3.5);
+          }
         }
-        const label = this.add.text(x, y - 43, '', { fontFamily: 'Segoe UI', fontSize: '13px',
-          color: '#233f38', backgroundColor: '#edf3ef', padding: { x: 3, y: 0 } }).setOrigin(0.5);
+        const label = this.add.text(x, y - 36, '', {
+          fontFamily: 'Segoe UI, sans-serif',
+          fontSize: '12px',
+          color: '#233f38',
+          backgroundColor: '#edf3efdd',
+          padding: { x: 4, y: 1 },
+        }).setOrigin(0.5).setDepth(7);
         this.resources.set(p.id, label);
       }
     }
-    for (const p of w.patches) this.resources.get(p.id)!.setText(`${p.resource}: ${p.quantity}`);
+
+    for (const p of w.patches) {
+      const lbl = this.resources.get(p.id);
+      if (lbl) lbl.setText(`${p.resource}: ${p.quantity}`);
+    }
+
+    // Render / update Pippin the meadow slime
+    if (w.critters && w.critters.length > 0) {
+      const c = w.critters[0];
+      const cx = c.x * 40 + 20;
+      const cy = c.y * 40 + 20;
+      if (!this.critterSprite) {
+        this.critterSprite = this.add.sprite(cx, cy, 'slime-front')
+          .setDepth(6)
+          .setScale(0.9)
+          .setInteractive({ useHandCursor: true });
+        this.critterSprite.play('slime-hop');
+        this.critterSprite.on('pointerdown', () => selectEntity('pippin', 'critter'));
+
+        this.add.text(cx, cy - 20, 'Pippin', {
+          fontFamily: 'Segoe UI, sans-serif',
+          fontSize: '11px',
+          color: '#d46b28',
+          backgroundColor: '#edf3efdd',
+          padding: { x: 3, y: 0 },
+        }).setOrigin(0.5).setDepth(7);
+      }
+      this.critterSprite.setPosition(cx, cy);
+      if (selectedCategory === 'critter' && selectedId === 'pippin') {
+        this.selection.setPosition(cx, cy);
+      }
+    }
+
+    // Render / update inhabitants
     for (const a of w.inhabitants) {
       let actor = this.actors.get(a.id);
+      let bubble = this.bubbles.get(a.id);
+
       if (!actor) {
-        const color = Phaser.Display.Color.HexStringToColor(a.color).color;
-        const body = this.add.circle(0, 0, 10, color).setStrokeStyle(2, 0x233f38);
-        const head = this.add.circle(0, -10, 5, 0xf2d5aa);
-        const label = this.add.text(0, 16, a.name, { fontFamily: 'Segoe UI', fontSize: '14px',
-          color: '#233f38', backgroundColor: '#edf3ef', padding: { x: 3, y: 0 } }).setOrigin(0.5, 0);
-        actor = this.add.container(0, 0, [body, head, label]).setDepth(7);
-        body.setInteractive({ useHandCursor: true });
-        body.on('pointerdown', () => { selected = a.id; renderInspector(); });
+        const charColor = Phaser.Display.Color.HexStringToColor(a.color).color;
+        // Shadow
+        const shadow = this.add.ellipse(0, 14, 22, 9, 0x000000, 0.28);
+        // Base character sprite
+        const sprite = this.add.sprite(0, 0, 'hero-idle').setScale(0.85);
+        sprite.play('hero-idle-anim');
+
+        // Color aura / collar dot
+        const colorDot = this.add.circle(0, 12, 4, charColor).setStrokeStyle(1.5, 0x233f38);
+
+        // Name tag
+        const label = this.add.text(0, 18, a.name, {
+          fontFamily: 'Segoe UI, sans-serif',
+          fontSize: '13px',
+          fontStyle: 'bold',
+          color: '#233f38',
+          backgroundColor: '#edf3efdd',
+          padding: { x: 4, y: 1 },
+        }).setOrigin(0.5, 0);
+
+        // Interactive click on inhabitant
+        actor = this.add.container(0, 0, [shadow, sprite, colorDot, label]).setDepth(7);
+        sprite.setInteractive({ useHandCursor: true });
+        sprite.on('pointerdown', () => selectEntity(a.id, 'inhabitant'));
         this.actors.set(a.id, actor);
+
+        // Action bubble indicator
+        bubble = this.add.text(0, 0, '💭', {
+          fontSize: '16px',
+          backgroundColor: '#ffffffdd',
+          padding: { x: 3, y: 1 },
+        }).setOrigin(0.5, 1).setDepth(8);
+        this.bubbles.set(a.id, bubble);
       }
-      // Grid movement mirrors committed positions; the viewer never advances simulation.
+
+      // Action animation state & bubble
+      const sprite = actor.list[1] as Phaser.GameObjects.Sprite;
+      const isMoving = a.plan && (a.x !== a.plan.destination.x || a.y !== a.plan.destination.y);
+      const isWorking = a.plan && !isMoving && (a.plan.action.kind === 'gather' || a.plan.action.kind === 'deposit');
+
+      if (isMoving) {
+        if (sprite.anims.currentAnim?.key !== 'hero-run-anim') sprite.play('hero-run-anim');
+      } else if (isWorking) {
+        if (sprite.anims.currentAnim?.key !== 'hero-work-anim') sprite.play('hero-work-anim');
+      } else {
+        if (sprite.anims.currentAnim?.key !== 'hero-idle-anim') sprite.play('hero-idle-anim');
+      }
+
+      // Handle multiple inhabitants sharing the same tile
       const sharing = w.inhabitants.filter(other => other.x === a.x && other.y === a.y);
       const index = sharing.findIndex(other => other.id === a.id);
-      const offsets = [[-9, -9], [9, 9], [-9, 9], [9, -9]];
+      const offsets = [[-8, -8], [8, 8], [-8, 8], [8, -8]];
       const [dx, dy] = sharing.length > 1 ? offsets[index] : [0, 0];
-      actor.setPosition(a.x * 40 + 20 + dx, a.y * 40 + 20 + dy);
-      (actor.list[2] as Phaser.GameObjects.Text).setY(16 + (sharing.length > 1 ? index * 14 : 0));
-      if (a.id === selected) this.selection.setPosition(actor.x, actor.y);
+
+      const targetX = a.x * 40 + 20 + dx;
+      const targetY = a.y * 40 + 20 + dy;
+
+      // Smooth interpolation toward target tile position
+      actor.x = Phaser.Math.Linear(actor.x || targetX, targetX, 0.25);
+      actor.y = Phaser.Math.Linear(actor.y || targetY, targetY, 0.25);
+
+      (actor.list[3] as Phaser.GameObjects.Text).setY(18 + (sharing.length > 1 ? index * 12 : 0));
+
+      if (bubble) {
+        const emoji = a.plan ? actionEmoji(a.plan.action.kind) : '💭';
+        bubble.setText(emoji);
+        bubble.setPosition(actor.x, actor.y - 20);
+      }
+
+      if (selectedCategory === 'inhabitant' && a.id === selectedId) {
+        this.selection.setPosition(actor.x, actor.y);
+      }
     }
   }
 }
 
-new Phaser.Game({ type: Phaser.CANVAS, parent: 'valley', width: 800, height: 560,
-  backgroundColor: '#77985a', scene: ValleyScene,
+new Phaser.Game({
+  type: Phaser.CANVAS,
+  parent: 'valley',
+  width: 800,
+  height: 560,
+  backgroundColor: '#6c944d',
+  scene: ValleyScene,
   scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
-  banner: false, audio: { noAudio: true }, fps: { target: 20, forceSetTimeOut: true } });
+  banner: false,
+  audio: { noAudio: true },
+  fps: { target: 24, forceSetTimeOut: true },
+});
+
 void poll();
