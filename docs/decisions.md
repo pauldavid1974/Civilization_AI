@@ -1,5 +1,25 @@
 # Decisions and unresolved choices
 
+## Prototype 0.1 continuation — 29 October 2026
+
+Paul explicitly authorized the original engine (no AI Town fork/imports), TypeScript/Node,
+SQLite, a Phaser browser viewer, four inhabitants, and a bounded local implementation plus
+unmerged PR. This supersedes the earlier governance-only authorization for this slice.
+He also requested use of Game Studio; its Phaser, UI and playtest guidance was applied.
+
+Implementation defaults remain provisional: one-second fixed ticks, 600 ticks each of daylight
+and night, no stopped-process catch-up, finite resources and a deterministic test policy.
+The adapter is provider-independent but contains no actual inference. The selected packages
+are pinned in package.json/lockfile: Phaser 4.2.1 for rendering, TypeScript 7.0.2 for strict
+checking, esbuild 0.28.2 for a small local build, @types/node 24.19.2 for Node's standard APIs.
+Node 24.19.x supplies SQLite directly, avoiding a native database package. Node's SQLite API
+is still experimental in this runtime; tested behavior is bounded to this prototype.
+
+No owner approval is inferred for spending, providers/models, new accounts/services,
+deployment/public access, governance changes or a final time ratio. Existing CI cannot be
+extended without crossing the explicit control-change boundary; product checks run separately.
+See the [active spec](specs/living-valley-0.1.md) for acceptance and deferred work.
+
 Paul (`@pauldavid1974`) is the sole owner. Assistant agreement and architecture recommendations
 are not owner ratification. This record preserves that distinction.
 

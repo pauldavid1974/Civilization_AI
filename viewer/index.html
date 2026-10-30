@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Living Valley</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/style.css">
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <header>
+    <div><h1>The Living Valley</h1><p>Four lives. A shared place. A history taking shape.</p></div>
+    <div class="time"><strong id="time">Connecting…</strong><span id="connection" role="status">Opening the valley</span></div>
+  </header>
+  <main>
+    <section aria-label="Valley overview" class="world-panel">
+      <div id="valley" role="img" aria-label="Live valley map. Choose an inhabitant using the buttons below."></div>
+      <nav id="inhabitants" aria-label="Choose an inhabitant"></nav>
+      <p class="caption">Select a person to follow their actions. The valley keeps moving when this page is closed.</p>
+      <div class="stores"><h2>Shared store</h2><p id="stock">Waiting for the first observation.</p></div>
+      <p class="prototype">Prototype 0.1 · Deterministic test agents. Language-model cognition is pending.</p>
+    </section>
+    <aside aria-label="Inhabitant inspector">
+      <h2 id="name">Inhabitant</h2>
+      <p id="goal"></p><p id="action"></p>
+      <dl id="details"></dl>
+      <h3>What they have seen</h3>
+      <p class="explanation">Personal observations may be out of date. They are separate from the observer’s view of the world.</p>
+      <ul id="knowledge"></ul>
+    </aside>
+    <section class="history" aria-label="Recent world history">
+      <h2>Valley journal</h2>
+      <p class="explanation">Recorded actions and physical outcomes, newest first.</p>
+      <ol id="events"></ol>
+    </section>
+  </main>
+  <footer>Local observer · Time and ongoing plans are saved by the world engine.</footer>
+</body>
+</html>
