@@ -57,7 +57,6 @@ function renderInspector(): void {
   if (!snapshot) return;
   const w = snapshot.world;
 
-  // Update button pressed states
   for (const [id, btn] of inhabitantButtons) {
     btn.setAttribute('aria-pressed', String(selectedCategory !== 'landmark' && id === selectedId));
   }
@@ -84,7 +83,6 @@ function renderInspector(): void {
     metersEl.replaceChildren();
     detailsEl.replaceChildren();
 
-    // Check who is currently at or near this landmark
     const occupants = w.inhabitants.filter(a => Math.abs(a.x - landmark.x) + Math.abs(a.y - landmark.y) <= 1);
     const occupantNames = occupants.length ? occupants.map(o => o.name).join(', ') : 'None currently present';
 
@@ -155,14 +153,12 @@ function renderInspector(): void {
     return;
   }
 
-  // Inhabitant inspector
   const a = w.inhabitants.find(a => a.id === selectedId) ?? w.inhabitants[0];
   badgeEl.textContent = 'INHABITANT';
   text('name', a.name);
   text('goal', `Prefers gathering ${a.preference}; hunger, energy, and day/night cycle guide decisions.`);
   text('action', actionLabel(a));
 
-  // Render Hunger and Energy meters
   metersEl.replaceChildren();
   for (const [name, val, cls] of [
     ['Hunger', a.hunger, 'hunger'],
@@ -214,7 +210,6 @@ function renderPage(): void {
   text('time', `Day ${snapshot.day} · ${snapshot.phase.toUpperCase()} · Tick ${w.tick}s`);
   text('stock', `${w.stock.berries} berries · ${w.stock.wood} wood stored in granary · ${w.consumed.berries} total berries consumed`);
 
-  // Build inhabitant navigation buttons once
   if (!inhabitantButtons.size) {
     const container = element('inhabitants');
     for (const a of w.inhabitants) {
@@ -229,7 +224,6 @@ function renderPage(): void {
       container.append(btn);
       inhabitantButtons.set(a.id, btn);
     }
-    // Pippin the slime button
     const slimeBtn = document.createElement('button');
     slimeBtn.type = 'button';
     const slimeDot = document.createElement('span');
@@ -242,7 +236,6 @@ function renderPage(): void {
     inhabitantButtons.set('pippin', slimeBtn);
   }
 
-  // Build landmark navigation buttons once
   if (!landmarkButtons.size && w.landmarks) {
     const container = element('landmarks');
     for (const l of w.landmarks) {
@@ -258,7 +251,6 @@ function renderPage(): void {
 
   renderInspector();
 
-  // Render recent event journal
   const eventsEl = element('events');
   eventsEl.replaceChildren();
   for (const e of [...snapshot.events].reverse().slice(0, 16)) {
@@ -289,7 +281,6 @@ async function poll(): Promise<void> {
 }
 
 class ValleyScene extends Phaser.Scene {
-  private terrainGfx!: Phaser.GameObjects.Graphics;
   private windmillBlade!: Phaser.GameObjects.Sprite;
   private campfireLight!: Phaser.GameObjects.Arc;
   private actors = new Map<string, Phaser.GameObjects.Container>();
@@ -300,7 +291,7 @@ class ValleyScene extends Phaser.Scene {
   private bubbles = new Map<string, Phaser.GameObjects.Text>();
 
   preload(): void {
-    // Load Pocket Village 16x16 tilesets and spritesheets
+    // Pocket Village 16x16 tilesets and spritesheets
     this.load.image('ground', '/assets/Tilesets/Ground Tiles.png');
     this.load.image('buildings', '/assets/Tilesets/PreMade Buildings.png');
     this.load.image('props', '/assets/Tilesets/Building Props.png');
@@ -377,10 +368,46 @@ class ValleyScene extends Phaser.Scene {
       });
     }
 
-    const g = this.add.graphics();
-    this.terrainGfx = g;
+    // 1. Slice sub-frames from Ground Tiles.png
+    const groundTex = this.textures.get('ground');
+    if (!groundTex.has('grass-0')) groundTex.add('grass-0', 0, 0, 0, 16, 16);
+    if (!groundTex.has('grass-1')) groundTex.add('grass-1', 0, 16, 0, 16, 16);
+    if (!groundTex.has('grass-2')) groundTex.add('grass-2', 0, 32, 0, 16, 16);
+    if (!groundTex.has('dirt-path')) groundTex.add('dirt-path', 0, 16, 416, 16, 16);
+    if (!groundTex.has('water-tile')) groundTex.add('water-tile', 0, 16, 80, 16, 16);
+    if (!groundTex.has('farmland-tile')) groundTex.add('farmland-tile', 0, 0, 416, 16, 16);
+    if (!groundTex.has('cliff-tile')) groundTex.add('cliff-tile', 0, 16, 32, 16, 16);
 
-    // Render 20x14 cell base landscape
+    // 2. Slice sub-frames from PreMade Buildings.png
+    const bldgTex = this.textures.get('buildings');
+    if (!bldgTex.has('cottage-west')) bldgTex.add('cottage-west', 0, 16, 256, 112, 64);
+    if (!bldgTex.has('cottage-east')) bldgTex.add('cottage-east', 0, 160, 256, 112, 64);
+    if (!bldgTex.has('windmill-tower')) bldgTex.add('windmill-tower', 0, 416, 64, 64, 80);
+    if (!bldgTex.has('workshop-shed')) bldgTex.add('workshop-shed', 0, 352, 64, 32, 80);
+
+    // 3. Slice sub-frames from Building Props.png
+    const propsTex = this.textures.get('props');
+    if (!propsTex.has('stone-well')) propsTex.add('stone-well', 0, 16, 96, 32, 32);
+    if (!propsTex.has('wooden-bridge')) propsTex.add('wooden-bridge', 0, 128, 48, 32, 16);
+    if (!propsTex.has('barrel')) propsTex.add('barrel', 0, 0, 16, 16, 16);
+    if (!propsTex.has('crates')) propsTex.add('crates', 0, 0, 32, 16, 16);
+    if (!propsTex.has('workbench')) propsTex.add('workbench', 0, 32, 0, 32, 16);
+
+    // 4. Slice sub-frames from Decor.png
+    const decorTex = this.textures.get('decor');
+    if (!decorTex.has('oak-tree')) decorTex.add('oak-tree', 0, 0, 0, 48, 64);
+    if (!decorTex.has('pine-tree')) decorTex.add('pine-tree', 0, 80, 0, 32, 48);
+    if (!decorTex.has('berry-bush')) decorTex.add('berry-bush', 0, 0, 144, 48, 32);
+    if (!decorTex.has('campfire-lit')) decorTex.add('campfire-lit', 0, 0, 128, 16, 16);
+    if (!decorTex.has('rock-large')) decorTex.add('rock-large', 0, 16, 48, 32, 32);
+    if (!decorTex.has('flowers')) decorTex.add('flowers', 0, 32, 224, 16, 16);
+
+    // 5. Slice sub-frames from Shadows.png
+    const shadowTex = this.textures.get('shadows');
+    if (!shadowTex.has('shadow-med')) shadowTex.add('shadow-med', 0, 0, 0, 48, 16);
+    if (!shadowTex.has('shadow-large')) shadowTex.add('shadow-large', 0, 0, 16, 64, 32);
+
+    // Render 20x14 cell base landscape using Ground Tiles.png
     for (let y = 0; y < 14; y++) {
       for (let x = 0; x < 20; x++) {
         const px = x * 40;
@@ -388,39 +415,25 @@ class ValleyScene extends Phaser.Scene {
 
         // River stream down column 0, with wooden bridge at y=6
         if (x === 0) {
+          this.add.image(px, py, 'ground', 'water-tile')
+            .setDisplaySize(40, 40)
+            .setOrigin(0, 0)
+            .setDepth(1);
           if (y === 6) {
-            g.fillStyle(0x7c5432, 1);
-            g.fillRect(px, py + 8, 40, 24);
-            g.fillStyle(0x56381e, 1);
-            g.fillRect(px, py + 6, 40, 3);
-            g.fillRect(px, py + 31, 40, 3);
-          } else {
-            g.fillStyle(0x477891, 0.95);
-            g.fillRect(px, py, 40, 40);
-            g.fillStyle(0x73a8c2, 0.7);
-            g.fillRect(px + 4, py + 8 + (y * 5) % 20, 28, 4);
+            this.add.image(px, py + 8, 'props', 'wooden-bridge')
+              .setDisplaySize(40, 24)
+              .setOrigin(0, 0)
+              .setDepth(2);
           }
-          continue;
-        }
-
-        // Riverbank transition
-        if (x === 1) {
-          g.fillStyle(0x60874e, 1);
-          g.fillRect(px, py, 40, 40);
-          g.fillStyle(0x355b6b, 0.5);
-          g.fillRect(px, py, 4, 40);
           continue;
         }
 
         // Farmland soil plots around (14..16, 8..9)
         if (x >= 14 && x <= 16 && y >= 8 && y <= 9) {
-          g.fillStyle(0x543c2c, 1);
-          g.fillRect(px + 1, py + 1, 38, 38);
-          g.fillStyle(0x3b2a1f, 0.7);
-          for (let row = 6; row < 36; row += 10) g.fillRect(px + 3, py + row, 34, 3);
-          g.fillStyle(0x589445, 0.9);
-          g.fillCircle(px + 10, py + 18, 3);
-          g.fillCircle(px + 24, py + 28, 3);
+          this.add.image(px, py, 'ground', 'farmland-tile')
+            .setDisplaySize(40, 40)
+            .setOrigin(0, 0)
+            .setDepth(1);
           continue;
         }
 
@@ -433,47 +446,37 @@ class ValleyScene extends Phaser.Scene {
           || (x === 12 && y === 6);
 
         if (isPath) {
-          g.fillStyle(0x94714e, 1);
-          g.fillRect(px + 2, py + 2, 36, 36);
-          g.fillStyle(0xab8865, 0.8);
-          g.fillCircle(px + 12, py + 14, 2);
-          g.fillCircle(px + 26, py + 24, 2);
+          this.add.image(px, py, 'ground', 'dirt-path')
+            .setDisplaySize(40, 40)
+            .setOrigin(0, 0)
+            .setDepth(1);
           continue;
         }
 
         // Cliff ridges at NW and NE corners
         if ((x === 1 && y === 0) || (x >= 18 && y <= 1)) {
-          g.fillStyle(0x64696c, 1);
-          g.fillRect(px + 2, py + 2, 36, 36);
-          g.fillStyle(0x4c5053, 0.8);
-          g.fillRect(px + 4, py + 24, 32, 12);
+          this.add.image(px, py, 'ground', 'cliff-tile')
+            .setDisplaySize(40, 40)
+            .setOrigin(0, 0)
+            .setDepth(1);
           continue;
         }
 
-        // Lush green meadow grass with subtle variations
-        const tone = (x * 17 + y * 11) % 4;
-        const grassColors = [0x6c944d, 0x648c46, 0x729c52, 0x5e8540];
-        g.fillStyle(grassColors[tone], 1);
-        g.fillRect(px, py, 40, 40);
-
-        // Wildflower and grass tufts
-        if ((x + y * 3) % 5 === 0) {
-          g.fillStyle(0x9cb865, 0.7);
-          g.fillRect(px + 8, py + 12, 3, 6);
-          g.fillRect(px + 12, py + 10, 3, 8);
-        } else if ((x * 2 + y) % 7 === 0) {
-          g.fillStyle(0xdfba5a, 0.9);
-          g.fillCircle(px + 24, py + 20, 2);
-        }
+        // Natural meadow grass with texture variations
+        const variant = ['grass-0', 'grass-1', 'grass-2'][(x * 7 + y * 13) % 3];
+        this.add.image(px, py, 'ground', variant)
+          .setDisplaySize(40, 40)
+          .setOrigin(0, 0)
+          .setDepth(1);
       }
     }
 
-    // Render permanent landmark structures
+    // Render permanent landmark structures using PreMade Buildings.png and Props
     this.renderLandmarkVisuals();
 
     // Night lighting overlay and cozy campfire glow
     this.night = this.add.rectangle(400, 280, 800, 560, 0x142136, 0).setDepth(8);
-    this.campfireLight = this.add.circle(8 * 40 + 20, 5 * 40 + 20, 32, 0xf7b85e, 0).setDepth(9);
+    this.campfireLight = this.add.circle(8 * 40 + 20, 5 * 40 + 20, 36, 0xf7b85e, 0).setDepth(9);
 
     // Selection ring
     this.selection = this.add.circle(0, 0, 18).setStrokeStyle(2.5, 0xffffff, 0.95).setDepth(12);
@@ -483,153 +486,125 @@ class ValleyScene extends Phaser.Scene {
       fontFamily: 'Georgia, serif',
       fontSize: '20px',
       color: '#1a332c',
-      backgroundColor: '#edf3efcc',
+      backgroundColor: '#edf3efdd',
       padding: { x: 8, y: 3 },
     }).setDepth(15);
   }
 
   private renderLandmarkVisuals(): void {
-    const g = this.terrainGfx;
-
-    // 1. Pioneer's Cottage at (5, 4)
+    // 1. Pioneer's Cottage at (5, 4) from PreMade Buildings.png
     const cwX = 5 * 40 + 20;
     const cwY = 4 * 40 + 20;
-    // Ground shadow
-    g.fillStyle(0x000000, 0.2);
-    g.fillEllipse(cwX, cwY + 16, 56, 18);
-    // Timber cottage walls
-    g.fillStyle(0x765239, 1);
-    g.fillRect(cwX - 24, cwY - 20, 48, 36);
-    // Thatched roof
-    g.fillStyle(0xb58e49, 1);
-    g.fillTriangle(cwX, cwY - 38, cwX - 28, cwY - 14, cwX + 28, cwY - 14);
-    // Stone chimney
-    g.fillStyle(0x5a5d61, 1);
-    g.fillRect(cwX + 12, cwY - 36, 8, 16);
-    // Cozy doorway & warm window
-    g.fillStyle(0x382214, 1);
-    g.fillRect(cwX - 6, cwY + 2, 12, 14);
-    g.fillStyle(0xf5d97a, 0.9);
-    g.fillRect(cwX + 10, cwY - 8, 8, 8);
+    this.add.image(cwX, cwY + 16, 'shadows', 'shadow-large').setScale(1.8).setDepth(2);
+    const cottageWest = this.add.image(cwX, cwY + 8, 'buildings', 'cottage-west')
+      .setOrigin(0.5, 0.7)
+      .setScale(0.85)
+      .setDepth(4)
+      .setInteractive({ useHandCursor: true });
+    cottageWest.on('pointerdown', () => selectEntity('cottage-west', 'landmark'));
 
-    const cottageWestText = this.add.text(cwX, cwY - 44, "Pioneer's Cottage", {
+    const cottageWestText = this.add.text(cwX, cwY - 32, "Pioneer's Cottage", {
       fontFamily: 'Segoe UI, sans-serif',
       fontSize: '12px',
+      fontStyle: 'bold',
       color: '#233f38',
       backgroundColor: '#edf3efdd',
       padding: { x: 4, y: 1 },
     }).setOrigin(0.5).setDepth(7).setInteractive({ useHandCursor: true });
     cottageWestText.on('pointerdown', () => selectEntity('cottage-west', 'landmark'));
 
-    // 2. Valley Haven Cottage at (15, 7)
+    // 2. Valley Haven Cottage at (15, 7) from PreMade Buildings.png
     const ceX = 15 * 40 + 20;
     const ceY = 7 * 40 + 20;
-    g.fillStyle(0x000000, 0.2);
-    g.fillEllipse(ceX, ceY + 16, 56, 18);
-    g.fillStyle(0x6e4a32, 1);
-    g.fillRect(ceX - 24, ceY - 20, 48, 36);
-    g.fillStyle(0xa1523e, 1);
-    g.fillTriangle(ceX, ceY - 38, ceX - 28, ceY - 14, ceX + 28, ceY - 14);
-    g.fillStyle(0x382214, 1);
-    g.fillRect(ceX - 6, ceY + 2, 12, 14);
-    g.fillStyle(0xf5d97a, 0.9);
-    g.fillRect(ceX - 18, ceY - 8, 8, 8);
+    this.add.image(ceX, ceY + 16, 'shadows', 'shadow-large').setScale(1.8).setDepth(2);
+    const cottageEast = this.add.image(ceX, ceY + 8, 'buildings', 'cottage-east')
+      .setOrigin(0.5, 0.7)
+      .setScale(0.85)
+      .setDepth(4)
+      .setInteractive({ useHandCursor: true });
+    cottageEast.on('pointerdown', () => selectEntity('cottage-east', 'landmark'));
 
-    const cottageEastText = this.add.text(ceX, ceY - 44, 'Valley Haven', {
+    const cottageEastText = this.add.text(ceX, ceY - 32, 'Valley Haven', {
       fontFamily: 'Segoe UI, sans-serif',
       fontSize: '12px',
+      fontStyle: 'bold',
       color: '#233f38',
       backgroundColor: '#edf3efdd',
       padding: { x: 4, y: 1 },
     }).setOrigin(0.5).setDepth(7).setInteractive({ useHandCursor: true });
     cottageEastText.on('pointerdown', () => selectEntity('cottage-east', 'landmark'));
 
-    // 3. Commons & Campfire Plaza at (9, 5) & (8, 5)
+    // 3. Commons & Campfire Plaza at (9, 5) & (8, 5) from Building Props.png & Decor.png
     const comX = 9 * 40 + 20;
     const comY = 5 * 40 + 20;
-    // Circular stone paved plaza
-    g.fillStyle(0x8f938d, 0.7);
-    g.fillCircle(comX, comY, 26);
-    // Stone water well
-    g.fillStyle(0x525654, 1);
-    g.fillCircle(comX, comY, 14);
-    g.fillStyle(0x436f87, 1);
-    g.fillCircle(comX, comY, 9);
-    g.fillStyle(0x704829, 1);
-    g.fillRect(comX - 11, comY - 14, 4, 16);
-    g.fillRect(comX + 7, comY - 14, 4, 16);
-    g.fillRect(comX - 13, comY - 16, 26, 4);
+    const stoneWell = this.add.image(comX, comY + 4, 'props', 'stone-well')
+      .setScale(1.1)
+      .setDepth(4)
+      .setInteractive({ useHandCursor: true });
+    stoneWell.on('pointerdown', () => selectEntity('commons', 'landmark'));
 
-    // Campfire at (8, 5)
     const fireX = 8 * 40 + 20;
     const fireY = 5 * 40 + 20;
-    g.fillStyle(0x523d2e, 1);
-    g.fillCircle(fireX, fireY, 12);
-    g.fillStyle(0xd9572b, 0.95);
-    g.fillTriangle(fireX, fireY - 10, fireX - 6, fireY + 4, fireX + 6, fireY + 4);
-    g.fillStyle(0xf7c443, 0.95);
-    g.fillTriangle(fireX, fireY - 6, fireX - 4, fireY + 2, fireX + 4, fireY + 2);
+    this.add.image(fireX, fireY + 4, 'decor', 'campfire-lit')
+      .setScale(1.5)
+      .setDepth(4);
 
-    const commonsText = this.add.text(comX - 20, comY - 32, 'Commons & Well', {
+    const commonsText = this.add.text(comX - 20, comY - 26, 'Commons & Well', {
       fontFamily: 'Segoe UI, sans-serif',
       fontSize: '12px',
+      fontStyle: 'bold',
       color: '#233f38',
       backgroundColor: '#edf3efdd',
       padding: { x: 4, y: 1 },
     }).setOrigin(0.5).setDepth(7).setInteractive({ useHandCursor: true });
     commonsText.on('pointerdown', () => selectEntity('commons', 'landmark'));
 
-    // 4. Valley Workshop at (12, 7)
+    // 4. Valley Workshop at (12, 7) from PreMade Buildings.png & Props
     const wsX = 12 * 40 + 20;
     const wsY = 7 * 40 + 20;
-    g.fillStyle(0x000000, 0.2);
-    g.fillEllipse(wsX, wsY + 16, 50, 16);
-    g.fillStyle(0x695038, 1);
-    g.fillRect(wsX - 20, wsY - 14, 40, 28);
-    g.fillStyle(0x443020, 1);
-    g.fillRect(wsX - 24, wsY - 22, 48, 10);
-    // Workbench & anvil prop
-    g.fillStyle(0x8c6239, 1);
-    g.fillRect(wsX - 16, wsY + 4, 20, 8);
-    g.fillStyle(0x3e4247, 1);
-    g.fillRect(wsX + 6, wsY + 4, 10, 8);
+    this.add.image(wsX, wsY + 16, 'shadows', 'shadow-med').setScale(1.5).setDepth(2);
+    const workshopShed = this.add.image(wsX, wsY + 4, 'buildings', 'workshop-shed')
+      .setOrigin(0.5, 0.7)
+      .setScale(0.9)
+      .setDepth(4)
+      .setInteractive({ useHandCursor: true });
+    workshopShed.on('pointerdown', () => selectEntity('workshop', 'landmark'));
+
+    this.add.image(wsX + 22, wsY + 14, 'props', 'workbench').setScale(1.2).setDepth(5);
+    this.add.image(wsX - 20, wsY + 14, 'props', 'crates').setScale(1.2).setDepth(5);
 
     const workshopText = this.add.text(wsX, wsY - 32, 'Workshop', {
       fontFamily: 'Segoe UI, sans-serif',
       fontSize: '12px',
+      fontStyle: 'bold',
       color: '#233f38',
       backgroundColor: '#edf3efdd',
       padding: { x: 4, y: 1 },
     }).setOrigin(0.5).setDepth(7).setInteractive({ useHandCursor: true });
     workshopText.on('pointerdown', () => selectEntity('workshop', 'landmark'));
 
-    // 5. Village Windmill & Granary at (9, 7)
+    // 5. Village Windmill & Granary at (9, 7) from PreMade Buildings.png & WindmillBlade-Animation.png
     const wmX = 9 * 40 + 20;
     const wmY = 7 * 40 + 16;
-    // Ground shadow
-    g.fillStyle(0x000000, 0.25);
-    g.fillEllipse(wmX, wmY + 20, 60, 20);
-    // Stone mill tower body
-    g.fillStyle(0x84888a, 1);
-    g.fillRect(wmX - 22, wmY - 32, 44, 50);
-    // Wooden trim & roof cap
-    g.fillStyle(0x5d412d, 1);
-    g.fillRect(wmX - 26, wmY - 38, 52, 8);
-    g.fillStyle(0x8c3d2e, 1);
-    g.fillTriangle(wmX, wmY - 56, wmX - 24, wmY - 38, wmX + 24, wmY - 38);
-    // Granary double doors
-    g.fillStyle(0x3b2416, 1);
-    g.fillRect(wmX - 10, wmY + 2, 20, 16);
-    // Grain sacks & crates
-    g.fillStyle(0xccaf78, 1);
-    g.fillCircle(wmX - 16, wmY + 12, 5);
-    g.fillCircle(wmX + 16, wmY + 12, 5);
+    this.add.image(wmX, wmY + 18, 'shadows', 'shadow-large').setScale(1.6).setDepth(2);
+
+    const windmillTower = this.add.image(wmX, wmY - 4, 'buildings', 'windmill-tower')
+      .setOrigin(0.5, 0.6)
+      .setScale(1.0)
+      .setDepth(4)
+      .setInteractive({ useHandCursor: true });
+    windmillTower.on('pointerdown', () => selectEntity('granary', 'landmark'));
+
+    this.add.image(wmX - 18, wmY + 16, 'props', 'barrel').setScale(1.2).setDepth(5);
+    this.add.image(wmX + 18, wmY + 16, 'props', 'crates').setScale(1.2).setDepth(5);
 
     // Animated Windmill Blades
-    this.windmillBlade = this.add.sprite(wmX, wmY - 42, 'windmill')
+    this.windmillBlade = this.add.sprite(wmX, wmY - 38, 'windmill')
       .setDepth(6)
-      .setScale(0.55);
+      .setScale(0.68)
+      .setInteractive({ useHandCursor: true });
     this.windmillBlade.play('spin-windmill');
+    this.windmillBlade.on('pointerdown', () => selectEntity('granary', 'landmark'));
 
     const granaryText = this.add.text(wmX, wmY + 28, 'Windmill & Granary', {
       fontFamily: 'Segoe UI, sans-serif',
@@ -640,49 +615,44 @@ class ValleyScene extends Phaser.Scene {
       padding: { x: 4, y: 1 },
     }).setOrigin(0.5).setDepth(7).setInteractive({ useHandCursor: true });
     granaryText.on('pointerdown', () => selectEntity('granary', 'landmark'));
+
+    // Nature decor: Rocks and Flowers
+    this.add.image(18 * 40 + 20, 2 * 40 + 20, 'decor', 'rock-large').setScale(1.1).setDepth(3);
+    this.add.image(17 * 40 + 12, 11 * 40 + 12, 'decor', 'flowers').setScale(1.3).setDepth(3);
   }
 
   update(): void {
     if (!snapshot) return;
     const w = snapshot.world;
 
-    // Smooth day/night lighting transition
     const targetAlpha = snapshot.phase === 'night' ? 0.45 : 0;
     this.night.alpha = Phaser.Math.Linear(this.night.alpha, targetAlpha, 0.08);
     this.campfireLight.alpha = snapshot.phase === 'night' ? 0.28 : 0;
 
-    // Render / update resource nodes
+    // Render / update resource nodes using Decor.png
     if (!this.resources.size) {
-      const g = this.terrainGfx;
       for (const p of w.patches) {
         const x = p.x * 40 + 20;
         const y = p.y * 40 + 20;
         if (p.resource === 'wood') {
-          // Pine and oak timber grove
-          g.fillStyle(0x000000, 0.2);
-          g.fillEllipse(x, y + 14, 38, 14);
-          g.fillStyle(0x5a3d28, 1);
-          g.fillRect(x - 3, y - 2, 6, 18);
-          g.fillStyle(0x28593a, 1);
-          g.fillTriangle(x, y - 30, x - 18, y + 4, x + 18, y + 4);
-          g.fillStyle(0x356e49, 1);
-          g.fillTriangle(x, y - 22, x - 14, y + 4, x + 14, y + 4);
-        } else {
-          // Lush berry bushes with juicy fruit clusters
-          g.fillStyle(0x000000, 0.2);
-          g.fillEllipse(x, y + 12, 36, 12);
-          g.fillStyle(0x3d6e38, 1);
-          g.fillCircle(x, y, 16);
-          g.fillStyle(0x4a8244, 1);
-          g.fillCircle(x - 4, y - 3, 11);
-          g.fillStyle(0xba324b, 1);
-          for (const [dx, dy] of [[-6, 1], [4, -6], [7, 5], [-2, 8]]) {
-            g.fillCircle(x + dx, y + dy, 3.5);
+          if (p.id === 'east-wood') {
+            // Pine grove at (13, 3)
+            this.add.image(x, y + 14, 'shadows', 'shadow-med').setScale(1.2).setDepth(2);
+            this.add.image(x, y + 6, 'decor', 'pine-tree').setScale(1.15).setDepth(4);
+          } else {
+            // Oak tree grove at (4, 10)
+            this.add.image(x, y + 14, 'shadows', 'shadow-large').setScale(1.2).setDepth(2);
+            this.add.image(x, y + 4, 'decor', 'oak-tree').setScale(0.95).setDepth(4);
           }
+        } else {
+          // Lush berry bushes from Decor.png
+          this.add.image(x, y + 12, 'shadows', 'shadow-med').setScale(1.1).setDepth(2);
+          this.add.image(x, y + 6, 'decor', 'berry-bush').setScale(0.95).setDepth(4);
         }
-        const label = this.add.text(x, y - 36, '', {
+        const label = this.add.text(x, y - 32, '', {
           fontFamily: 'Segoe UI, sans-serif',
           fontSize: '12px',
+          fontStyle: 'bold',
           color: '#233f38',
           backgroundColor: '#edf3efdd',
           padding: { x: 4, y: 1 },
@@ -712,6 +682,7 @@ class ValleyScene extends Phaser.Scene {
         this.add.text(cx, cy - 20, 'Pippin', {
           fontFamily: 'Segoe UI, sans-serif',
           fontSize: '11px',
+          fontStyle: 'bold',
           color: '#d46b28',
           backgroundColor: '#edf3efdd',
           padding: { x: 3, y: 0 },
@@ -730,13 +701,13 @@ class ValleyScene extends Phaser.Scene {
 
       if (!actor) {
         const charColor = Phaser.Display.Color.HexStringToColor(a.color).color;
-        // Shadow
-        const shadow = this.add.ellipse(0, 14, 22, 9, 0x000000, 0.28);
+        // Shadow from Shadows.png
+        const shadow = this.add.image(0, 14, 'shadows', 'shadow-med').setScale(0.6).setAlpha(0.7);
         // Base character sprite
         const sprite = this.add.sprite(0, 0, 'hero-idle').setScale(0.85);
         sprite.play('hero-idle-anim');
 
-        // Color aura / collar dot
+        // Color aura badge
         const colorDot = this.add.circle(0, 12, 4, charColor).setStrokeStyle(1.5, 0x233f38);
 
         // Name tag
@@ -749,13 +720,11 @@ class ValleyScene extends Phaser.Scene {
           padding: { x: 4, y: 1 },
         }).setOrigin(0.5, 0);
 
-        // Interactive click on inhabitant
         actor = this.add.container(0, 0, [shadow, sprite, colorDot, label]).setDepth(7);
         sprite.setInteractive({ useHandCursor: true });
         sprite.on('pointerdown', () => selectEntity(a.id, 'inhabitant'));
         this.actors.set(a.id, actor);
 
-        // Action bubble indicator
         bubble = this.add.text(0, 0, '💭', {
           fontSize: '16px',
           backgroundColor: '#ffffffdd',
@@ -764,7 +733,6 @@ class ValleyScene extends Phaser.Scene {
         this.bubbles.set(a.id, bubble);
       }
 
-      // Action animation state & bubble
       const sprite = actor.list[1] as Phaser.GameObjects.Sprite;
       const isMoving = a.plan && (a.x !== a.plan.destination.x || a.y !== a.plan.destination.y);
       const isWorking = a.plan && !isMoving && (a.plan.action.kind === 'gather' || a.plan.action.kind === 'deposit');
@@ -777,7 +745,6 @@ class ValleyScene extends Phaser.Scene {
         if (sprite.anims.currentAnim?.key !== 'hero-idle-anim') sprite.play('hero-idle-anim');
       }
 
-      // Handle multiple inhabitants sharing the same tile
       const sharing = w.inhabitants.filter(other => other.x === a.x && other.y === a.y);
       const index = sharing.findIndex(other => other.id === a.id);
       const offsets = [[-8, -8], [8, 8], [-8, 8], [8, -8]];
@@ -786,7 +753,6 @@ class ValleyScene extends Phaser.Scene {
       const targetX = a.x * 40 + 20 + dx;
       const targetY = a.y * 40 + 20 + dy;
 
-      // Smooth interpolation toward target tile position
       actor.x = Phaser.Math.Linear(actor.x || targetX, targetX, 0.25);
       actor.y = Phaser.Math.Linear(actor.y || targetY, targetY, 0.25);
 
@@ -810,7 +776,7 @@ new Phaser.Game({
   parent: 'valley',
   width: 800,
   height: 560,
-  backgroundColor: '#6c944d',
+  backgroundColor: '#538569',
   scene: ValleyScene,
   scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
   banner: false,
