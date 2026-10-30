@@ -1,5 +1,20 @@
 # Work log — Civilization_AI
 
+## 2026-10-29 — Activate and verify GitHub protections
+
+- **Branch:** `chore/activate-governance-protections`; documentation proposal in PR #2.
+- **Authorization:** after merging PR #1, Paul instructed proceeding with the protection plan.
+- **Completed:** verified the base-branch review status on PR #2, applied the existing V3 tool
+  with the merged solo-owner profile, independently read back the active ruleset and effective
+  branch rules, and checked Actions permissions. See `docs/governance-activation.md`.
+- **Result:** required PRs and five checks, linear history, resolved conversations, blocked
+  force pushes/deletion, no bypass actors, and no second-account approval requirement.
+  Public visibility and the original MIT license are unchanged.
+- **Validation:** governance/project checks and local commit gates pass; final GitHub results
+  are recorded on PR #2. No destructive enforcement tests or simulation tests were run.
+- **Next:** Paul reviews/merges the documentation. Simulation implementation remains separately
+  scoped; this operational step does not approve unresolved product decisions.
+
 ## 2026-10-29 — Propose governance v3 single-owner installation
 
 - **Branch:** `chore/setup-governance-v3-single-owner`.
