@@ -147,3 +147,25 @@ vite.config.ts.timestamp-*
 
 # Turbo Repo
 .turbo
+
+# Governance kit protections; preserve the existing Node ignore rules above.
+*.key
+*.pem
+secrets.*
+*.local
+config.local.*
+.governance-backup/
+CLAUDE.local.md
+.claude/settings.local.json
+.claude/review/
+
+# Downloaded models and private civilization runtime state
+models/
+saves/
+backups/
+*.db
+*.db-*
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.sqlite3-*
