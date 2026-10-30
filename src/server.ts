@@ -1,6 +1,6 @@
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
-import { resolve, join } from 'node:path';
+import { resolve, join, normalize } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { performance } from 'node:perf_hooks';
 import { WorldStore } from './store.ts';
@@ -23,7 +23,7 @@ export async function startRuntime(options: RuntimeOptions) {
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
-    res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; object-src 'none'; frame-ancestors 'none'");
+    res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; object-src 'none'; frame-ancestors 'none'");
     const allowedHosts = [`127.0.0.1:${port}`, `localhost:${port}`];
     if (!allowedHosts.includes(req.headers.host ?? '') || req.headers['sec-fetch-site'] === 'cross-site') {
       res.writeHead(403); res.end('Local observer only.'); return;
@@ -31,15 +31,54 @@ export async function startRuntime(options: RuntimeOptions) {
     if (req.method !== 'GET') { res.writeHead(405, { Allow: 'GET' }); res.end('Read-only observer.'); return; }
     if (req.url === '/api/world') {
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
-      res.end(JSON.stringify({ world: store.world, events: store.recentEvents(),
-        day: day(store.world), phase: phase(store.world), cognition: deterministicAgent.name })); return;
+      res.end(JSON.stringify({
+        world: store.world,
+        events: store.recentEvents(),
+        day: day(store.world),
+        phase: phase(store.world),
+        cognition: deterministicAgent.name,
+      }));
+      return;
     }
-    const route = routes[req.url ?? ''];
-    if (!route) { res.writeHead(404); res.end('Not found.'); return; }
-    try {
-      const content = await readFile(join(viewerDir, route[0]));
-      res.setHeader('Content-Type', route[1]); res.end(content);
-    } catch { res.writeHead(503); res.end('Viewer unavailable. Run npm run build, then restart.'); }
+    const parsedPath = decodeURIComponent((req.url ?? '').split('?')[0]);
+    const route = routes[parsedPath];
+    if (route) {
+      try {
+        const content = await readFile(join(viewerDir, route[0]));
+        res.setHeader('Content-Type', route[1]); res.end(content);
+        return;
+      } catch {
+        res.writeHead(503); res.end('Viewer unavailable. Run npm run build, then restart.');
+        return;
+      }
+    }
+    if (parsedPath.startsWith('/assets/')) {
+      const rel = parsedPath.slice('/assets/'.length);
+      const safe = normalize(rel).replace(/^(\.\.[\/\\])+/, '');
+      const full = join(viewerDir, 'assets', safe);
+      const base = resolve(viewerDir, 'assets');
+      if (!resolve(full).startsWith(base)) {
+        res.writeHead(403); res.end('Forbidden.'); return;
+      }
+      try {
+        const content = await readFile(full);
+        const ext = safe.split('.').pop()?.toLowerCase();
+        const types: Record<string, string> = {
+          png: 'image/png',
+          jpg: 'image/jpeg',
+          jpeg: 'image/jpeg',
+          svg: 'image/svg+xml',
+          txt: 'text/plain; charset=utf-8',
+          json: 'application/json',
+        };
+        res.setHeader('Content-Type', types[ext ?? ''] ?? 'application/octet-stream');
+        res.end(content);
+        return;
+      } catch {
+        res.writeHead(404); res.end('Asset not found.'); return;
+      }
+    }
+    res.writeHead(404); res.end('Not found.');
   });
   try {
     await new Promise<void>((done, fail) => {

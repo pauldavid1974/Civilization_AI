@@ -1,5 +1,44 @@
 # Work log — Civilization_AI
 
+## 2026-10-29 — PR #3 Merge & Pocket Village World Upgrade
+
+- **Authorization:** owner's explicit handoff prompt authorized merging PR #3 into `main` after
+  verifying checks and resolving review threads, creating `feat/pocket-village-world`, and integrating
+  the Pocket Village V1.1.1 asset pack and world upgrades.
+- **Merge PR #3:** verified all 5 required checks (`Governance / invariants`, `Governance / secrets`,
+  `Governance / actions-security`, `Project / checks`, `governance/exact-head-review`) green, resolved
+  two review conversation threads, and squash merged PR #3 into `main` (`9339978`).
+- **Branch:** `feat/pocket-village-world` created from updated `main`.
+- **Integrated Assets:** extracted and organized Pocket Village V1.1.1 pixel-art assets into
+  `viewer/assets/` (`Tilesets`, `NPCs`, `Pocket Hero`, `Enemy`), well under file-size limits.
+- **Authoritative World Model:**
+  - Added five permanent village landmarks: The Village Windmill & Granary (`granary` at `9, 7`),
+    Pioneer's Cottage (`cottage-west` at `5, 4`), Valley Haven Cottage (`cottage-east` at `15, 7`),
+    Commons & Campfire Plaza (`commons` at `9, 5`), and Valley Workshop (`workshop` at `12, 7`).
+  - Added terrain walkability grid with authoritative `blocked` cells (river stream, cliffs, structural walls)
+    and bounded BFS pathfinding in `nextStep()` to navigate around obstacles.
+  - Implemented enhanced shelter rest affordance (+35 energy recovery in shelter vs +25 in open terrain).
+  - Implemented granary food consumption affordance when hungry (>60 hunger) with empty inventory.
+  - Added Pippin the gentle orange meadow slime critter hopping in southeastern pasture, perceived locally.
+  - Canonicalized save paths in `WorldStore` via `realpathSync` to prevent companion lease collisions.
+- **Upgraded Phaser Viewer:**
+  - 16-frame animated spinning windmill blades on the mill tower.
+  - Character action state animations (idle, run, attack/harvest) and floating action emote bubbles.
+  - Animated bouncing meadow slime sprite.
+  - Interactive selection and inspection for both inhabitants and landmarks.
+  - Visual status meters for hunger and energy.
+  - Smooth day/night lighting transitions with warm campfire glow.
+  - Static asset serving under `/assets/*` with path-containment checks and CSP `blob:` support.
+- **Verification Evidence:**
+  - `npm run check`: strict TypeScript pass (zero errors), 20 automated unit/integration tests pass
+    (including 1,200-tick determinism, 6,000-tick material conservation, landmarks, BFS navigation,
+    shelter rest, granary consumption, and wildlife perception), and esbuild bundle succeeds.
+  - Playwright browser smoke test: verified headless Chromium rendering, button navigation,
+    zero console errors, zero failed network requests, and clean local asset loading.
+  - Governance checks: `validate-governance.sh` and `project-checks.sh` pass.
+  - License integrity: original MIT license byte-for-byte with `DraganDrop` preserved (`b60acde446066bf5a02fed0affd4ce414e864087`).
+- **Attribution:** credited SebbySpoons (Pocket Village 16×16 Tileset) and Erisesra (Character animation template).
+
 ## 2026-10-29 — The Living Valley, Prototype 0.1
 
 - **Authorization:** owner's continuation permits bounded local implementation and PR; excludes

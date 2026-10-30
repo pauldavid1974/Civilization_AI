@@ -1,5 +1,5 @@
 import { DatabaseSync } from 'node:sqlite';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, realpathSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { createWorld, step, validateConfig, type Config, type World, type WorldEvent } from './world.ts';
 import type { Cognition } from './cognition.ts';
@@ -13,9 +13,12 @@ export class WorldStore {
     if (path !== ':memory:') {
       path = resolve(path);
       mkdirSync(dirname(path), { recursive: true });
+      // Canonicalize filesystem path (resolving any symlinks) before deriving lease filename
+      let realPath = path;
+      try { realPath = realpathSync(path); } catch { /* path might not exist prior to creation */ }
       // A separate SQLite transaction holds the process lease across snapshot commits.
       // SQLite releases it after a crash, avoiding stale PID/lockfile recovery guesses.
-      const lease = new DatabaseSync(`${path}.writer.sqlite`);
+      const lease = new DatabaseSync(`${realPath}.writer.sqlite`);
       try { lease.exec('BEGIN IMMEDIATE'); }
       catch { lease.close(); throw new Error('This save already has an active world writer.'); }
       this.lease = lease;

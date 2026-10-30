@@ -3,38 +3,67 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>The Living Valley</title>
+  <title>The Living Valley · Civilization_AI</title>
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="/style.css">
   <script type="module" src="/app.js"></script>
 </head>
 <body>
   <header>
-    <div><h1>The Living Valley</h1><p>Four lives. A shared place. A history taking shape.</p></div>
-    <div class="time"><strong id="time">Connecting…</strong><span id="connection" role="status">Opening the valley</span></div>
+    <div>
+      <h1>The Living Valley</h1>
+      <p>A persistent, autonomous AI civilization experiment. Four inhabitants live, explore, and shape history in a living pocket valley.</p>
+    </div>
+    <div class="time">
+      <strong id="time">Connecting…</strong>
+      <span id="connection" role="status">Opening the valley</span>
+    </div>
   </header>
   <main>
     <section aria-label="Valley overview" class="world-panel">
-      <div id="valley" role="img" aria-label="Live valley map. Choose an inhabitant using the buttons below."></div>
-      <nav id="inhabitants" aria-label="Choose an inhabitant"></nav>
-      <p class="caption">Select a person to follow their actions. The valley keeps moving when this page is closed.</p>
-      <div class="stores"><h2>Shared store</h2><p id="stock">Waiting for the first observation.</p></div>
-      <p class="prototype">Prototype 0.1 · Deterministic test agents. Language-model cognition is pending.</p>
+      <div id="valley" role="img" aria-label="Live interactive valley map. Click any inhabitant, landmark, or creature to inspect."></div>
+      <div class="nav-section">
+        <label class="nav-label">Inhabitants & Wildlife</label>
+        <nav id="inhabitants" aria-label="Choose an inhabitant or creature"></nav>
+      </div>
+      <div class="nav-section">
+        <label class="nav-label">Village Landmarks</label>
+        <nav id="landmarks" aria-label="Choose a village landmark"></nav>
+      </div>
+      <p class="caption">Click people or landmarks to inspect. The authoritative engine advances continuously even when this browser tab is closed.</p>
+      <div class="stores">
+        <h2>Village Granary & Shared Store</h2>
+        <p id="stock">Loading stores…</p>
+      </div>
+      <p class="prototype">Prototype 0.1 · Pocket Village World · Deterministic test cognition; LLM capabilities pending.</p>
     </section>
-    <aside aria-label="Inhabitant inspector">
-      <h2 id="name">Inhabitant</h2>
-      <p id="goal"></p><p id="action"></p>
+    <aside aria-label="Inspector panel">
+      <div class="inspector-header">
+        <h2 id="name">Inhabitant</h2>
+        <span id="badge" class="badge">Inhabitant</span>
+      </div>
+      <p id="goal"></p>
+      <h3>Current activity</h3>
+      <p id="action"></p>
+      <div id="meters" class="meters-container"></div>
+      <h3>Status details</h3>
       <dl id="details"></dl>
-      <h3>What they have seen</h3>
-      <p class="explanation">Personal observations may be out of date. They are separate from the observer’s view of the world.</p>
+      <h3 id="knowledge-heading">Personal observations & memory</h3>
+      <p class="explanation" id="knowledge-sub">Evidence witnessed firsthand (Manhattan radius 2). Personal memory may become stale as reality changes.</p>
       <ul id="knowledge"></ul>
     </aside>
     <section class="history" aria-label="Recent world history">
-      <h2>Valley journal</h2>
-      <p class="explanation">Recorded actions and physical outcomes, newest first.</p>
+      <h2>Valley journal & activity log</h2>
+      <p class="explanation">Recorded physical actions and verified world consequences, newest first.</p>
       <ol id="events"></ol>
     </section>
   </main>
-  <footer>Local observer · Time and ongoing plans are saved by the world engine.</footer>
+  <footer>
+    <p class="caption">
+      Authoritative TypeScript/Node engine with atomic SQLite persistence. Built for Paul Osborn (@pauldavid1974).<br>
+      Tileset & buildings: <em>Pocket Village 16×16</em> by <strong>SebbySpoons</strong> (<a href="https://sebbyspoons.itch.io" target="_blank" rel="noopener">sebbyspoons.itch.io</a>) ·
+      Character templates: <strong>Erisesra</strong> (<a href="https://erisesra.itch.io/character-templates-pack" target="_blank" rel="noopener">itch.io</a>)
+    </p>
+  </footer>
 </body>
 </html>

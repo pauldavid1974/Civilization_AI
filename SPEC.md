@@ -1,8 +1,9 @@
 # Spec — Governance v3 single-owner setup
 
-This setup is complete. The active product implementation contract is
-[The Living Valley — Prototype 0.1](docs/specs/living-valley-0.1.md), written and committed
-before product code under Paul's 29 October 2026 continuation authorization.
+This setup is complete. The active product implementation contracts are
+[The Living Valley — Prototype 0.1](docs/specs/living-valley-0.1.md) and
+[Pocket Village World](docs/specs/pocket-village-world.md), written and committed
+under Paul's 29 October 2026 authorizations.
 
 ## Outcome
 
@@ -47,7 +48,3 @@ at `a975cec88ee8c39d93b4f41538dcef711a610896` and the existing solo variant desc
 - PR targets `main`, remains open/unmerged, and contains no simulation code.
 
 ## Open questions
-
-No governance owner choice blocks this proposal. The template naming ambiguity, first-PR
-review-gate limitation and unapplied hosting protection are explicit in the provenance doc.
-Product choices are deferred in `docs/decisions.md`; setup does not approve them.

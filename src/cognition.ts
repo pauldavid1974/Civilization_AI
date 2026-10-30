@@ -1,8 +1,16 @@
-import { carried, distance, type Action, type Inhabitant, type Observation, type Position } from './world.ts';
+import { carried, distance, type Action, type Inhabitant, type Observation, type Position, type Landmark } from './world.ts';
 
 export type Perception = {
-  self: Inhabitant; observations: Observation[]; tick: number; phase: 'daylight' | 'night';
-  width: number; height: number; home: Position;
+  self: Inhabitant;
+  observations: Observation[];
+  tick: number;
+  phase: 'daylight' | 'night';
+  width: number;
+  height: number;
+  home: Position;
+  landmarks: Landmark[];
+  nearbyInhabitants: { id: string; name: string; x: number; y: number }[];
+  nearbyWildlife: { id: string; name: string; x: number; y: number }[];
 };
 // No provider SDK, credentials or full-world handle crosses this boundary.
 // shortcut: synchronous test policy only; use a bounded async mailbox before adding real inference.
@@ -13,6 +21,8 @@ export const deterministicAgent: Cognition = {
   propose(p): Action {
     const a = p.self;
     if (a.hunger > 45 && a.inventory.berries > 0) return { kind: 'eat' };
+    // Inhabitant knows the village granary / shared store exists at home and seeks nourishment there
+    if (a.hunger > 60) return { kind: 'eat' };
     if (a.energy < 30 || (p.phase === 'night' && a.energy < 85)) return { kind: 'rest' };
     if (carried(a) >= 4) return { kind: 'deposit' };
     const wanted = a.hunger > 45 ? 'berries' : a.preference;
