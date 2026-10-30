@@ -18,8 +18,32 @@ Governance documentation remains a proposal for Paul to merge.
 4. Independently read back the ruleset, effective branch rules and Actions permissions.
 5. Record observed results here and leave this governance PR open for Paul.
 
-## Initial observation
+## Verified result — 29 October 2026
 
-Setup PR #1 is merged. The read-only plan detects ruleset support and proposes all five checks,
-PRs, resolved conversations, linear history, blocked force pushes/deletion, zero approving
-reviews and no second-account review requirements. Activation results are pending validation.
+Setup PR #1 is merged. The existing V3 `github-governance.ps1` ran first in read-only plan mode,
+then with `-Apply` and this repository's explicit `.github/governance-profile.json`.
+
+Independent API reads verified active ruleset
+[`repo-governance-v3`, ID 26171850](https://github.com/pauldavid1974/Civilization_AI/rules/26171850):
+
+- Applies to the default branch only, with no bypass actors, including no administrator bypass.
+- Requires a pull request, resolved review conversations and current passing checks.
+- Requires linear history; permitted merge methods are squash or rebase.
+- Blocks force pushes and default-branch deletion.
+- Requires exactly the five profile statuses, all bound to GitHub Actions integration 15368:
+  `Governance / invariants`, `Governance / secrets`, `Governance / actions-security`,
+  `Project / checks`, and `governance/exact-head-review`.
+- Requires zero approving reviews; code-owner, last-push and extra unattributed-change
+  approval requirements are false. Stale-review dismissal remains enabled.
+- Actions default token permissions are read-only and Actions cannot approve pull requests.
+- Repository remains public, default branch `main`; original `LICENSE` blob remains
+  `b60acde446066bf5a02fed0affd4ce414e864087`, including `DraganDrop`.
+
+Before activation, the [review-gate run](https://github.com/pauldavid1974/Civilization_AI/actions/runs/40978563294)
+on follow-up PR #2 published success on exact head `cc1b15f85cfe764f613ae10812f535ae3dd720f1`,
+with description “Independent review not required by repository policy”. This governance-path
+change exercises the solo opt-out rather than the prose-only exemption.
+
+The effective rules for `main` were also read back separately. No destructive force-push or
+branch-deletion attempt was made as a test. Final-head workflow results are recorded on PR #2.
+Green automation does not ratify governance: Paul alone reviews and merges this documentation PR.

@@ -38,7 +38,7 @@ available follow-up review. It omits the review's private operational details.
 | Historical retention and recovery commitments | Proposed contracts need owner selection and restore evidence. |
 | Private thought inspection and public projection | Access and broadcast policy unresolved; keep runtime records out of public Git. |
 | Hosting, visitors, resident web access, generations, streaming | Future separate decisions; none authorized by setup. |
-| Applying GitHub protection settings | Desired profile proposed; no remote settings changed by setup. |
+| Applying GitHub protection settings | Paul authorized proceeding after PR #1 merged; active settings independently verified in `docs/governance-activation.md`. |
 
 The prior assistant's 10-minute day and 10-minute night is an example, not an approved constant.
 Population and performance estimates in the review are planning hypotheses, not measurements.
